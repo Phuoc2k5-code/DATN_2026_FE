@@ -1,22 +1,36 @@
-import React, { useState } from 'react';
-
+import React, { useState, useEffect, use } from 'react';
+import { useNavigate } from 'react-router-dom';
 export default function LoginPage () {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
-
+  const navigate = useNavigate();
   const handleLogin = (e) => {
     e.preventDefault();
-    setError('');
-    if (!email || !password) {
-      setError('Vui lòng nhập đầy đủ Email và Mật khẩu.');
-      return;
-    }
-
-    // Xử lý logic đăng nhập ở đây (ví dụ: gọi API)
-    console.log('Đăng nhập với:', email, password);
-    alert('Đăng nhập thành công!');
+    // Gọi API đăng nhập
+    fetch('http://127.0.0.1:8000/api/login', {
+      method: 'POST',
+      headers: {  
+        'Content-Type': 'application/json',
+        'append': 'application/json',
+       },
+      body: JSON.stringify({ email, password }),
+    })
+    .then(response => response.json())
+    .then(data => {
+      if (data.token && data.token !== '') {
+        localStorage.setItem('token', data.token);
+        navigate('/'); // Chuyển hướng đến trang chính
+      } else {
+        setError(data.message || 'Đăng nhập thất bại.');
+      }
+    })
+    .catch(error => {
+      console.error('Lỗi khi đăng nhập:', error);
+      setError('Có lỗi xảy ra. Vui lòng thử lại.');
+    });
   };
+  
 
   return (
     <div className="flex items-center justify-center min-h-screen bg-gray-100 p-4">
@@ -37,7 +51,7 @@ export default function LoginPage () {
           
           {error && <p className="text-red-500 text-sm text-center mb-4">{error}</p>}
 
-          <form onSubmit={handleLogin} className="space-y-6">
+          <form onSubmit={handleLogin} method='POST' className="space-y-6">
             <div className="text-left">
               <label htmlFor="email" className="block text-sm font-medium text-gray-700 ">Email</label>
               <input

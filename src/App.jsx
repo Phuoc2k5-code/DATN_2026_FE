@@ -5,15 +5,15 @@ import heroImg from './assets/hero.png'
 import './App.css'
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import LoginPage from './view/user/LoginPage';
+import HomePage from './view/user/HomePage';
 
 function App() {
-  const [count, setCount] = useState(0)
-
   return (
     <>    
       <BrowserRouter>
         <Routes>
           <Route path="/login" element={<LoginPage />} />
+          <Route path="/" element={<HomePage />} />
         </Routes>
       </BrowserRouter>
     </>
