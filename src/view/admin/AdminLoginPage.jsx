@@ -5,11 +5,11 @@ export default function LoginPage () {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const navigate = useNavigate();
-  
+
   const handleLogin = (e) => {
     e.preventDefault();
     // Gọi API đăng nhập
-    fetch('http://127.0.0.1:8000/api/login-user', {
+    fetch('http://127.0.0.1:8000/api/login-admin', {
       method: 'POST',
       headers: {  
         'Content-Type': 'application/json',
@@ -21,7 +21,7 @@ export default function LoginPage () {
     .then(data => {
       if (data.token && data.token !== '') {
         localStorage.setItem('token', data.token);
-        navigate('/'); // Chuyển hướng đến trang chính
+        navigate('/admin'); // Chuyển hướng đến trang chính
       } else {
         setError(data.message || 'Đăng nhập thất bại.');
       }

@@ -6,6 +6,8 @@ import './App.css'
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import LoginPage from './view/user/LoginPage';
 import HomePage from './view/user/HomePage';
+import AdminPage from './view/admin/AminPage';
+import AdminLoginPage from './view/admin/AdminLoginPage';
 
 function App() {
   return (
@@ -14,6 +16,8 @@ function App() {
         <Routes>
           <Route path="/login" element={<LoginPage />} />
           <Route path="/" element={<HomePage />} />
+          <Route path="/admin/login" element={<AdminLoginPage />} />
+          <Route path="/admin" element={<AdminPage />} />
         </Routes>
       </BrowserRouter>
     </>
