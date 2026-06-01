@@ -13,7 +13,7 @@ export default function LoginPage () {
       method: 'POST',
       headers: {  
         'Content-Type': 'application/json',
-        'append': 'application/json',
+        'Authorization': 'Bearer ' + localStorage.getItem('token')
        },
       body: JSON.stringify({ email, password }),
     })
@@ -21,7 +21,16 @@ export default function LoginPage () {
     .then(data => {
       if (data.token && data.token !== '') {
         localStorage.setItem('token', data.token);
-        navigate('/'); // Chuyển hướng đến trang chính
+        localStorage.setItem('user', JSON.stringify(data.user));
+        if (data.user.role === 'user') {
+          navigate('/'); // Chuyển hướng đến trang chính
+        }
+        else if (data.user.role === 'employer') {
+          navigate('/employer'); // Chuyển hướng đến trang chính
+        }
+        else{
+          setError('Vai trò người dùng không hợp lệ.');
+        }
       } else {
         setError(data.message || 'Đăng nhập thất bại.');
       }
