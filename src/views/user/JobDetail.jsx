@@ -1,9 +1,12 @@
 import React, { useState } from 'react';
-import { 
-  MapPin, Briefcase, DollarSign, Calendar, Clock, 
-  UserCheck, Building2, Share2, Bookmark, Send, 
-  CheckCircle, ChevronRight, Sparkles, AlertCircle
+import {
+  MapPin, Briefcase, DollarSign, Calendar, Clock,
+  UserCheck, Building2, Share2, Bookmark, Send,
+  CheckCircle, ChevronRight, Sparkles, AlertCircle,
+  Link
 } from 'lucide-react';
+
+import { Link as RouterLink } from 'react-router-dom'; // 💡 Đổi tên Link để tránh trùng với Link của lucide-react
 
 export default function JobDetail() {
   const [isSaved, setIsSaved] = useState(false);
@@ -13,6 +16,7 @@ export default function JobDetail() {
   const jobData = {
     title: 'Senior Frontend Developer (ReactJS / Tailwind)',
     company: 'FPT Software',
+    companyId: 'fpt-software',
     logoBg: 'bg-orange-600',
     location: 'Quận 9, TP. Hồ Chí Minh',
     salary: '22 - 35 Triệu',
@@ -52,28 +56,6 @@ export default function JobDetail() {
 
   return (
     <div className="min-h-screen bg-[#FFFDF9] font-sans text-slate-800 antialiased pb-16 w-full overflow-x-hidden">
-      
-      {/* 1. HEADER TRÀN VIỀN 100% */}
-      <header className="border-b border-slate-100 bg-white/90 backdrop-blur-md sticky top-0 z-40 w-full px-4 sm:px-6 lg:px-8">
-        <div className="max-w-7xl mx-auto flex items-center justify-between py-3.5">
-          <div className="flex items-center gap-2">
-            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-blue-600 to-indigo-600 font-black text-white text-lg">V</div>
-            <span className="text-lg font-bold tracking-tight text-slate-900">
-              VIECLAM<span className="text-blue-600 font-extrabold">PRO</span>
-            </span>
-          </div>
-          <nav className="hidden items-center gap-6 md:flex text-sm font-medium text-slate-600">
-            <a href="#home" className="hover:text-blue-600 transition-colors">Trang chủ</a>
-            <a href="#find-jobs" className="text-blue-600 font-semibold border-b-2 border-blue-600 pb-1">Tìm việc</a>
-            <a href="#companies" className="hover:text-blue-600 transition-colors">Công ty</a>
-            <a href="#ai" className="text-indigo-600 font-semibold flex items-center gap-0.5">Trợ lý số UC <Sparkles size={12} className="text-amber-500 animate-pulse" /></a>
-          </nav>
-          <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-full bg-blue-100 border border-blue-200 flex items-center justify-center text-xs font-bold text-blue-600">P</div>
-          </div>
-        </div>
-      </header>
-
       {/* 2. BLOCK HEADER CÔNG VIỆC (NỀN TRẮNG TRÀN NGANG, ĐỔ BÓNG NHẸ) */}
       <div className="w-full bg-white border-b border-slate-200/60 px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
         <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
@@ -95,15 +77,14 @@ export default function JobDetail() {
 
           {/* Các nút tương tác nhanh */}
           <div className="flex items-center gap-2.5 w-full md:w-auto border-t md:border-t-0 pt-4 md:pt-0 shrink-0">
-            <button 
+            <button
               onClick={() => setIsSaved(!isSaved)}
-              className={`flex-1 md:flex-none justify-center px-4 py-2.5 rounded-xl border font-bold text-xs flex items-center gap-1.5 transition-all ${
-                isSaved 
-                  ? 'bg-amber-50 border-amber-300 text-amber-600 shadow-sm' 
+              className={`flex-1 md:flex-none justify-center px-4 py-2.5 rounded-xl border font-bold text-xs flex items-center gap-1.5 transition-all ${isSaved
+                  ? 'bg-amber-50 border-amber-300 text-amber-600 shadow-sm'
                   : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'
-              }`}
+                }`}
             >
-              <Bookmark size={14} className={isSaved ? 'fill-amber-500' : ''} /> 
+              <Bookmark size={14} className={isSaved ? 'fill-amber-500' : ''} />
               {isSaved ? 'Đã lưu việc' : 'Lưu tin'}
             </button>
           </div>
@@ -113,13 +94,13 @@ export default function JobDetail() {
       {/* 3. VÙNG NỘI DUNG CHÍNH (CHIA BIỆT LẬP 2 CỘT NẰM TRONG KHUNG GOM GIỮA MAX-W-7XL) */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-6">
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start w-full">
-          
+
           {/* CỘT TRÁI (70%) - THÔNG TIN CHI TIẾT JD */}
           <div className="lg:col-span-2 space-y-5">
-            
+
             {/* Box nội dung JD */}
             <div className="bg-white border border-slate-200/80 rounded-2xl p-5 sm:p-6 shadow-sm space-y-6">
-              
+
               {/* Mục Mô tả */}
               <div>
                 <h3 className="text-xs font-black uppercase tracking-wider text-slate-400 border-l-4 border-blue-600 pl-2.5 mb-3">
@@ -169,8 +150,8 @@ export default function JobDetail() {
                 </h4>
                 <div className="flex flex-wrap gap-1.5">
                   {jobData.skills.map((skill, idx) => (
-                    <span 
-                      key={idx} 
+                    <span
+                      key={idx}
                       className="bg-blue-50/70 text-blue-600 border border-blue-100 text-[10.5px] font-bold px-2.5 py-1 rounded-lg shadow-sm"
                     >
                       {skill}
@@ -192,19 +173,18 @@ export default function JobDetail() {
 
           {/* CỘT PHẢI (30%) - THÔNG TIN TỔNG QUAN & ACTION BUTTON */}
           <div className="space-y-5">
-            
+
             {/* BOX 1: THÔNG TIN CHUNG & NÚT APPLY */}
             <div className="bg-white border border-slate-200/80 rounded-2xl p-5 shadow-sm space-y-4">
-              
+
               {/* Nút Ứng tuyển lớn độc chiếm đầu bảng */}
-              <button 
+              <button
                 onClick={() => setHasApplied(true)}
                 disabled={hasApplied}
-                className={`w-full py-3 rounded-xl font-black text-xs uppercase tracking-wider flex items-center justify-center gap-2 transition-all shadow-md ${
-                  hasApplied 
-                    ? 'bg-emerald-600 text-white cursor-default' 
+                className={`w-full py-3 rounded-xl font-black text-xs uppercase tracking-wider flex items-center justify-center gap-2 transition-all shadow-md ${hasApplied
+                    ? 'bg-emerald-600 text-white cursor-default'
                     : 'bg-blue-600 hover:bg-blue-700 text-white hover:shadow-lg hover:-translate-y-0.5 active:translate-y-0'
-                }`}
+                  }`}
               >
                 {hasApplied ? (
                   <>Đã nộp hồ sơ thành công</>
@@ -246,7 +226,7 @@ export default function JobDetail() {
                 <Building2 size={14} className="text-blue-600" />
                 <h3 className="text-[11px] font-black uppercase tracking-wider text-slate-700">Thông tin công ty</h3>
               </div>
-              
+
               <div className="space-y-1">
                 <h4 className="font-bold text-slate-900 text-xs">{jobData.company}</h4>
                 <p className="text-[10px] text-slate-400 font-medium">Quy mô: {jobData.companyInfo.scale}</p>
@@ -260,10 +240,10 @@ export default function JobDetail() {
                 <span className="block font-bold text-slate-500 uppercase text-[8.5px]">Địa điểm làm việc</span>
                 <p className="leading-tight text-slate-500">{jobData.companyInfo.address}</p>
               </div>
-
-              <button className="w-full mt-2 py-1.5 bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-600 text-[10.5px] font-bold rounded-lg flex items-center justify-center gap-0.5 transition-colors">
+              
+              <RouterLink to={`/companies/${jobData.companyId}`} className="w-full mt-2 py-1.5 bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-600 text-[10.5px] font-bold rounded-lg flex items-center justify-center gap-0.5 transition-colors">
                 Xem trang công ty <ChevronRight size={12} />
-              </button>
+              </RouterLink>
             </div>
 
           </div>

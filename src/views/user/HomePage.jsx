@@ -1,15 +1,13 @@
 import React, { useState } from 'react';
-import { 
+import {
   MapPin, Briefcase, ChevronDown, Star, Search,
-  Calendar, MessageSquare, Bookmark, Bell, Settings, 
+  Calendar, MessageSquare, Bookmark, Bell, Settings,
   User, DollarSign, Sparkles
 } from 'lucide-react';
-import Header from '../party/header';
-import Banner from '../party/banner';
-import SidebarRight from '../party/sidebar_right';
-import SidebarLeft from '../party/sidebar_left';
-
-import Job from '../component/Job';
+import Banner from '../../layouts/layout_user/Banner';
+import SidebarLeft from '../../layouts/layout_user/SidebarLeft';
+import SidebarRight from '../../layouts/layout_user/SidebarRight';
+import Job from '../../components/JobCard';
 import JobDetail from './JobDetail';
 
 export default function Homepage() {
@@ -23,18 +21,11 @@ export default function Homepage() {
   ];
 
   return (
-    <div className="w-full min-h-screen bg-[#FFFDF9] font-sans text-slate-800 antialiased pb-12">
-      {/* 1. HEADER */}
-      <Header />
-      
-      {/* CONTAINER TỔNG TẤT CẢ NỘI DUNG */}
-      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 mt-6 space-y-6">
-        
+      <div className="w-full container mx-auto px-4 py-6 space-y-6">
         {/* 2. BANNER */}
         <Banner />
-        
         {/* 3. KHU VỰC CHIA CỘT PHÍA DƯỚI BANNER */}
-        <div className="flex gap-5 items-start">          
+        <div className="flex gap-5 items-start">
           {/* BỘ LỌC BÊN TRÁI (ĐÃ THU NHỎ SIÊU GỌN - WIDTH 210PX) */}
           <SidebarLeft />
           {/* HIỂN THỊ VIỆC LÀM PHÍA GIỮA */}
@@ -43,17 +34,15 @@ export default function Homepage() {
               <h2 className="text-[11px] font-bold uppercase text-slate-400 tracking-wider">Việc tìm nổi bật</h2>
               <span className="text-[11px] text-blue-600 font-semibold cursor-pointer hover:underline">Xem tất cả</span>
             </div>
-
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5">
               {jobs.map((job) => (
-                <Job key={job.id} job={job}/>
+                <Job key={job.id} job={job} />
               ))}
             </div>
           </div>
-          {/* THANH CÔNG CỤ BÊN PHẢI (FLOATING DOCK) */}
-            <SidebarRight />
+          {/* BỘ LỌC BÊN PHẢI (ĐÃ THU NHỎ SIÊU GỌN - WIDTH 56PX) */}
+          <SidebarRight />
         </div>
       </div>
-    </div>
   );
 }

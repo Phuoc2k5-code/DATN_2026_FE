@@ -110,3 +110,14 @@ code {
   padding: 4px 8px;
   background: var(--code-bg);
 }
+
+/* Ẩn thanh cuộn cho các trình duyệt dựa trên Webkit (Chrome, Safari, Edge) */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+/* Ẩn thanh cuộn cho Firefox và IE */
+.no-scrollbar {
+  -ms-overflow-style: none;  /* IE and Edge */
+  scrollbar-width: none;  /* Firefox */
+}
