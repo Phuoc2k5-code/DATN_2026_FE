@@ -1,6 +1,6 @@
 export default function Header() {
   return (
-    <header className="border-b border-orange-100 bg-white/80 backdrop-blur-md sticky top-0 z-40 px-6 py-3.5">
+    <header className="sticky top-0 z-[1000] border-b border-orange-100 bg-white/95 backdrop-blur-md px-6 py-3.5 w-full">
       <div className="mx-auto max-w-7xl flex items-center justify-between">
         <div className="flex items-center gap-2">
           <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-blue-600 to-indigo-600 font-black text-white text-lg">V</div>
@@ -10,11 +10,10 @@ export default function Header() {
         </div>
 
         <nav className="hidden items-center gap-6 md:flex text-sm font-medium text-slate-600">
-          <a href="#discover" className="text-blue-600 font-semibold border-b-2 border-blue-600 pb-1">Trong nhà</a>
-          <a href="#find-jobs" className="hover:text-blue-600 transition-colors">Tìm việc</a>
-          <a href="#news" className="hover:text-blue-600 transition-colors">Tin nhắn</a>
-          <a href="#companies" className="hover:text-blue-600 transition-colors">Công ty</a>
-          <a href="#ai-assistant" className="hover:text-blue-600 transition-colors text-indigo-600 font-semibold">Trợ lý số UC</a>
+          <a href="#discover" className="text-blue-600 font-semibold border-b-2 border-blue-600 pb-1">Tìm việc</a>
+          <a href="#find-jobs" className="hover:text-blue-600 transition-colors">Tạo CV</a>
+          <a href="#news" className="hover:text-blue-600 transition-colors">Lịch sử ứng tuyển</a>
+          <a href="#ai-assistant" className="hover:text-blue-600 transition-colors text-indigo-600 font-semibold">AI gợi ý</a>
         </nav>
 
         <div className="flex items-center gap-2.5">

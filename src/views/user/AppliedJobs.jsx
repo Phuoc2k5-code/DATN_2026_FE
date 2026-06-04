@@ -87,39 +87,50 @@ export default function AppliedJobs() {
   return (
     <div className="min-h-screen bg-[#FFFDF9] font-sans text-slate-800 antialiased pb-16 w-full relative">
       
-      {/* 🚀 HEADER TRANG */}
-      <div className="w-full bg-gradient-to-r from-slate-900 to-indigo-900 text-white px-4 sm:px-6 lg:px-8 py-10 shadow-md">
-        <div className="max-w-6xl mx-auto">
-          <Link to="/" className="inline-flex items-center gap-1.5 text-xs font-bold text-slate-300 hover:text-white transition-colors mb-4 group">
-            <ArrowLeft size={14} className="group-hover:-translate-x-0.5 transition-transform" /> Quay lại trang chủ
-          </Link>
-          
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-            <div className="flex items-center gap-3">
-              <div className="p-2.5 bg-white/10 border border-white/10 rounded-xl backdrop-blur-xs">
-                <FileText size={22} className="text-blue-400" />
-              </div>
-              <div>
-                <h1 className="text-xl sm:text-2xl font-black tracking-tight">Lịch sử ứng tuyển</h1>
-                <p className="text-xs font-medium text-slate-300/90 mt-0.5">
-                  Theo dõi trạng thái và lịch hẹn phỏng vấn từ nhà tuyển dụng
-                </p>
-              </div>
-            </div>
-
-            <div className="relative w-full sm:w-64 shrink-0">
-              <input
-                type="text"
-                placeholder="Tìm công ty, vị trí..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full text-xs font-semibold pl-8 pr-3 py-2 bg-white/10 border border-white/20 rounded-xl text-white placeholder-slate-400 focus:outline-none focus:bg-white focus:text-slate-800 focus:placeholder-slate-400 transition-all"
-              />
-              <Search size={13} className="absolute left-3 top-3 text-slate-400" />
-            </div>
-          </div>
+      {/* 🚀 HEADER TRANG (ĐÃ ĐỒNG BỘ 100% VỚI TRANG CHỦ) */}
+<div className="w-full bg-gradient-to-br from-orange-100/60 via-amber-50/40 to-white text-slate-800 px-4 sm:px-6 lg:px-8 py-10 border-b border-orange-100/70 shadow-sm">
+  <div className="max-w-6xl mx-auto">
+    
+    {/* Nút quay lại - Đổi hover sang màu cam chủ đạo */}
+    <Link to="/" className="flex items-center gap-1.5 text-xs font-semibold text-slate-500 hover:text-orange-500 transition-colors mb-5 group w-fit">
+      <ArrowLeft size={14} className="group-hover:-translate-x-0.5 transition-transform" /> 
+      Quay lại trang chủ
+    </Link>
+    
+    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-6">
+      
+      {/* Khối tiêu đề và Icon */}
+      <div className="flex items-center gap-4">
+        {/* Box chứa Icon đổi sang màu nền cam nhạt và bo góc mềm mại rounded-2xl */}
+        <div className="p-3 bg-orange-100/80 border border-orange-200/50 rounded-2xl shadow-sm backdrop-blur-xs">
+          <FileText size={22} className="text-orange-600" />
+        </div>
+        <div>
+          {/* Tiêu đề chính dùng font-extrabold và chuyển hẳn sang màu cam/hổ phách công nghệ */}
+          <h1 className="text-xl sm:text-2xl font-extrabold tracking-tight bg-gradient-to-r from-orange-600 to-amber-600 bg-clip-text text-transparent">
+            Lịch sử ứng tuyển
+          </h1>
+          <p className="text-xs font-medium text-slate-500 mt-1">
+            Theo dõi trạng thái và lịch hẹn phỏng vấn từ nhà tuyển dụng
+          </p>
         </div>
       </div>
+
+      {/* Thanh tìm kiếm - Chuyển sang phong cách nền sáng, viền mịn, focus đổi màu cam */}
+      <div className="relative w-full sm:w-64 shrink-0">
+        <input
+          type="text"
+          placeholder="Tìm công ty, vị trí..."
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+          className="w-full text-xs font-medium pl-9 pr-4 py-2.5 bg-white border border-slate-200 rounded-xl text-slate-800 placeholder-slate-400 focus:outline-none focus:border-orange-400 focus:ring-2 focus:ring-orange-100 transition-all shadow-xs"
+        />
+        <Search size={14} className="absolute left-3 top-3.5 text-slate-400" />
+      </div>
+
+    </div>
+  </div>
+</div>
 
       {/* 📦 BẢNG DỮ LIỆU LỊCH SỬ CHÍNH */}
       <main className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 mt-8">

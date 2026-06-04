@@ -4,7 +4,7 @@ export default function SidebarLeft() {
   const [minSalary, setMinSalary] = useState('');
   const [maxSalary, setMaxSalary] = useState('');
   return (
-    <div className="w-[210px] bg-white border border-slate-200/80 rounded-2xl p-3 shadow-sm space-y-4 shrink-0 hidden md:block">
+    <div className="w-[210px] bg-yellow-300 border border-slate-200/80 rounded-2xl p-3 shadow-sm space-y-4 shrink-0 hidden md:block">
       <div className="flex items-center gap-1 border-b border-slate-100 pb-2">
         <Star size={12} className="text-amber-500 fill-amber-500" />
         <h2 className="text-[11px] font-bold uppercase tracking-wider text-slate-700">Lọc tìm kiếm</h2>
@@ -73,6 +73,9 @@ export default function SidebarLeft() {
           <ChevronDown size={11} className="text-slate-400 absolute right-2 top-2.5 pointer-events-none" />
         </div>
       </div>
+      <button className="w-full py-2 text-[11px] font-bold text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors shadow-sm">
+        Áp dụng bộ lọc
+      </button>
     </div>
   )
 }

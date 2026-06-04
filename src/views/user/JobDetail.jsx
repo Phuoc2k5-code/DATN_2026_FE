@@ -3,14 +3,18 @@ import {
   MapPin, Briefcase, DollarSign, Calendar, Clock,
   UserCheck, Building2, Share2, Bookmark, Send,
   CheckCircle, ChevronRight, Sparkles, AlertCircle,
-  Link
+  Link, AlertTriangle
 } from 'lucide-react';
 
 import { Link as RouterLink } from 'react-router-dom'; // 💡 Đổi tên Link để tránh trùng với Link của lucide-react
 
+import ApplyModal from '../../components/ApplyModal';
+import ReportModal from '../../components/ReportModal';
+
 export default function JobDetail() {
   const [isSaved, setIsSaved] = useState(false);
-  const [hasApplied, setHasApplied] = useState(false);
+  const [isOpenApply, setIsOpenApply] = useState(false);
+  const [isOpenReport, setIsOpenReport] = useState(false);
 
   // Dữ liệu giả lập cho một tin tuyển dụng chi tiết
   const jobData = {
@@ -54,6 +58,13 @@ export default function JobDetail() {
     }
   };
 
+  // 💡 XỬ LÝ BẤM NÚT BÁO CÁO VI PHẠM
+  const handleOpenReport = (e) => {
+    e.preventDefault();  // Chặn chuyển trang
+    e.stopPropagation();  // 🚀 CHỐNG NỔI BỌT: Không cho click ăn vào thẻ Link cha
+    setIsOpenReport(true);
+  };
+
   return (
     <div className="min-h-screen bg-[#FFFDF9] font-sans text-slate-800 antialiased pb-16 w-full overflow-x-hidden">
       {/* 2. BLOCK HEADER CÔNG VIỆC (NỀN TRẮNG TRÀN NGANG, ĐỔ BÓNG NHẸ) */}
@@ -76,17 +87,40 @@ export default function JobDetail() {
           </div>
 
           {/* Các nút tương tác nhanh */}
-          <div className="flex items-center gap-2.5 w-full md:w-auto border-t md:border-t-0 pt-4 md:pt-0 shrink-0">
+          <div className="flex items-center gap-2 w-full md:w-auto border-t md:border-t-0 pt-4 md:pt-0 shrink-0">
+            {/* 1. NÚT LƯU TIN TUYỂN DỤNG */}
             <button
+              type="button"
               onClick={() => setIsSaved(!isSaved)}
               className={`flex-1 md:flex-none justify-center px-4 py-2.5 rounded-xl border font-bold text-xs flex items-center gap-1.5 transition-all ${isSaved
-                  ? 'bg-amber-50 border-amber-300 text-amber-600 shadow-sm'
-                  : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'
+                  ? 'bg-amber-50 border-amber-200 text-amber-600 shadow-xs'
+                  : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50 hover:text-slate-800'
                 }`}
             >
-              <Bookmark size={14} className={isSaved ? 'fill-amber-500' : ''} />
-              {isSaved ? 'Đã lưu việc' : 'Lưu tin'}
+              <Bookmark size={14} className={isSaved ? 'fill-amber-500 text-amber-500' : 'text-slate-400'} />
+              <span>{isSaved ? 'Đã lưu việc' : 'Lưu tin'}</span>
             </button>
+
+            {/* 2. NÚT BÁO CÁO VI PHẠM (Đã sửa lỗi logic màu sắc và tối ưu giao diện) */}
+            <button
+              type="button"
+              onClick={handleOpenReport} // Hàm xử lý riêng biệt, chống nổi bọt (stopPropagation)
+              className="flex-1 md:flex-none justify-center px-4 py-2.5 rounded-xl border border-slate-200 bg-white font-bold text-xs text-slate-600 flex items-center gap-1.5 transition-all hover:bg-rose-50 hover:border-rose-200 hover:text-rose-600"
+            >
+              <AlertTriangle size={13} className="text-rose-500 transition-colors" />
+              {isOpenReport ? (
+                <span className="text-rose-600 font-bold">Đã báo cáo</span>
+              ) : (
+                <span>Báo cáo</span>
+              )}
+            </button>
+            <ReportModal
+              isOpen={isOpenReport}
+              onClose={() => setIsOpenReport(false)}
+              jobTitle={jobData.title}
+              companyName={jobData.company}
+              jobId={jobData.companyId}
+            />    
           </div>
         </div>
       </div>
@@ -179,19 +213,20 @@ export default function JobDetail() {
 
               {/* Nút Ứng tuyển lớn độc chiếm đầu bảng */}
               <button
-                onClick={() => setHasApplied(true)}
-                disabled={hasApplied}
-                className={`w-full py-3 rounded-xl font-black text-xs uppercase tracking-wider flex items-center justify-center gap-2 transition-all shadow-md ${hasApplied
-                    ? 'bg-emerald-600 text-white cursor-default'
-                    : 'bg-blue-600 hover:bg-blue-700 text-white hover:shadow-lg hover:-translate-y-0.5 active:translate-y-0'
+                onClick={() => setIsOpenApply(true)}
+                disabled={isOpenApply}
+                className={`w-full py-3 rounded-xl font-black text-xs uppercase tracking-wider flex items-center justify-center gap-2 transition-all shadow-md ${isOpenApply
+                  ? 'bg-emerald-600 text-white cursor-default'
+                  : 'bg-blue-600 hover:bg-blue-700 text-white hover:shadow-lg hover:-translate-y-0.5 active:translate-y-0'
                   }`}
               >
-                {hasApplied ? (
+                {isOpenApply ? (
                   <>Đã nộp hồ sơ thành công</>
                 ) : (
                   <>Ứng tuyển ngay <Send size={13} className="animate-bounce" /></>
                 )}
               </button>
+              <ApplyModal isOpen={isOpenApply} onClose={() => setIsOpenApply(false)} companyName={jobData.company} />
 
               <div className="h-px bg-slate-100 my-1"></div>
 
@@ -240,7 +275,7 @@ export default function JobDetail() {
                 <span className="block font-bold text-slate-500 uppercase text-[8.5px]">Địa điểm làm việc</span>
                 <p className="leading-tight text-slate-500">{jobData.companyInfo.address}</p>
               </div>
-              
+
               <RouterLink to={`/companies/${jobData.companyId}`} className="w-full mt-2 py-1.5 bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-600 text-[10.5px] font-bold rounded-lg flex items-center justify-center gap-0.5 transition-colors">
                 Xem trang công ty <ChevronRight size={12} />
               </RouterLink>

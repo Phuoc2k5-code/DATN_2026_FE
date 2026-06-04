@@ -14,6 +14,9 @@ import CVManagement from './views/user/CVManagement';
 import SavedJobs from './views/user/SavedJobs';
 import AppliedJobs from './views/user/AppliedJobs';
 import CompanyDetail from './views/user/CompanyDetail';
+import AiJobs from './views/user/AIJobs';
+import CreateCV from './views/user/CreateCV';
+import UpdateCV from './views/user/CreateCV';
 // admin
 import AdminLoginPage from './views/auth/AdminLoginPage';
 import AdminPage from './views/admin/AdminPage';
@@ -35,6 +38,9 @@ function App() {
             <Route path="/saved-jobs" element={<SavedJobs />} />
             <Route path="/application-history" element={<AppliedJobs />} />
             <Route path="/companies/:id" element={<CompanyDetail />} />
+            <Route path="/ai-suggestions" element={<AiJobs />} />
+            <Route path="/create-cv" element={<CreateCV />} />
+            <Route path="/edit-cv/:id" element={<UpdateCV />} />
           </Route>
           <Route path="/employer" element={<EmployerPage />} />
           <Route path="/admin/login" element={<AdminLoginPage />} />

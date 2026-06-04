@@ -3,6 +3,7 @@ import Header from "./Header";
 import Banner from "./Banner";
 import SidebarRight from "./SidebarRight";
 import ChatBot from '../../components/ChatBotAI';
+import Footer from "./Footer";
 
 export default function Layout() {
   return (
@@ -15,8 +16,10 @@ export default function Layout() {
           {/* THANH CÔNG CỤ BÊN PHẢI (FLOATING DOCK) */}
           {/* <SidebarRight /> */}
         </div>
-        <ChatBot />
+        {/* <ChatBot /> */}
       </div>
+      {/* 4. FOOTER */}
+      <Footer />
     </div>
   )
 }

@@ -1,6 +1,8 @@
 import React from 'react';
-
+import { Trash2, FileEdit } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 const CVItem = ({ cv, onEdit, onDelete }) => {
+  const navigate = useNavigate();
   return (
     <div className="bg-white rounded-2xl p-5 border border-slate-150 shadow-sm hover:shadow-md transition-all duration-200 flex flex-col h-[320px] justify-between relative">
       
@@ -45,7 +47,7 @@ const CVItem = ({ cv, onEdit, onDelete }) => {
       {/* Bộ đôi nút Sửa và Xóa nằm sát đáy thẻ */}
       <div className="mt-4 pt-3 border-t border-slate-100 flex gap-2">
         <button
-          onClick={() => onEdit(cv.id)}
+          onClick={() => navigate(`/edit-cv/${cv.id}`)}
           className="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold py-2.5 px-4 rounded-xl transition-colors flex items-center justify-center gap-1"
         >
           ✏️ Sửa

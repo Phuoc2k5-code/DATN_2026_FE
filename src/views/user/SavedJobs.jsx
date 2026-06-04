@@ -39,24 +39,30 @@ export default function SavedJobs() {
     <div className="min-h-screen bg-[#FFFDF9] font-sans text-slate-800 antialiased pb-16 w-full">
       
       {/* 🚀 HEADER TRANG RIÊNG BIỆT (XANH CÔNG NGHỆ SANG TRỌNG) */}
-      <div className="w-full bg-gradient-to-r from-slate-900 to-blue-900 text-white px-4 sm:px-6 lg:px-8 py-10 shadow-md">
+      <div className="w-full bg-gradient-to-br from-orange-100/60 via-amber-50/40 to-white text-slate-800 px-4 sm:px-6 lg:px-8 py-10 border-b border-orange-100/70 shadow-sm">
         <div className="max-w-6xl mx-auto">
-          {/* Nút quay lại trang chủ / trang trước nhanh */}
-          <Link to="/" className="inline-flex items-center gap-1.5 text-xs font-bold text-slate-300 hover:text-white transition-colors mb-4 group">
-            <ArrowLeft size={14} className="group-hover:-translate-x-0.5 transition-transform" /> Quay lại trang chủ
+          
+          {/* Nút quay lại - Hover màu cam chủ đạo */}
+          <Link to="/" className="flex items-center gap-1.5 text-xs font-semibold text-slate-500 hover:text-orange-500 transition-colors mb-5 group w-fit">
+            <ArrowLeft size={14} className="group-hover:-translate-x-0.5 transition-transform" /> 
+            Quay lại trang chủ
           </Link>
           
-          <div className="flex items-center gap-3">
-            <div className="p-2.5 bg-white/10 border border-white/10 rounded-xl backdrop-blur-xs">
-              <Bookmark size={22} className="text-amber-400 fill-amber-400" />
-            </div>
-            <div>
-              <h1 className="text-xl sm:text-2xl font-black tracking-tight flex items-center gap-2">
-                Việc làm đã lưu
-              </h1>
-              <p className="text-xs font-medium text-slate-300/90 mt-0.5">
-                Bạn đang lưu <span className="text-amber-400 font-bold">{savedJobs.length}</span> cơ hội nghề nghiệp tiềm năng
-              </p>
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-6">
+            
+            {/* Khối tiêu đề và Icon (Đổi sang Bookmark đại diện cho việc làm đã lưu) */}
+            <div className="flex items-center gap-4">
+              <div className="p-3 bg-orange-100/80 border border-orange-200/50 rounded-2xl shadow-sm backdrop-blur-xs">
+                <Bookmark size={22} className="text-orange-600 fill-orange-600/10" />
+              </div>
+              <div>
+                <h1 className="text-xl sm:text-2xl font-extrabold tracking-tight bg-gradient-to-r from-orange-600 to-amber-600 bg-clip-text text-transparent">
+                  Việc làm đã lưu
+                </h1>
+                <p className="text-xs font-medium text-slate-500 mt-1">
+                  Bạn đang lưu <span className="text-orange-600 font-bold bg-orange-100/60 px-1.5 py-0.5 rounded border border-orange-200/40 mx-0.5">{savedJobs.length}</span> cơ hội nghề nghiệp tiềm năng
+                </p>
+              </div>
             </div>
           </div>
         </div>
