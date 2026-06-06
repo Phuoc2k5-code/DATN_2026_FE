@@ -20,7 +20,8 @@ import UpdateCV from './views/user/CreateCV';
 import CVPreviewAndTemplate from './views/user/CVPreviewAndTemplate';
 // admin
 import AdminLoginPage from './views/auth/AdminLoginPage';
-import AdminPage from './views/admin/AdminPage';
+import LayoutAdmin from './layouts/layout_admin/Layout';
+import AdminDashboard from './views/admin/AdminDashboard';
 // employer
 import EmployerPage from './views/employer/EmployerPage';
 
@@ -46,7 +47,9 @@ function App() {
           </Route>
           <Route path="/employer" element={<EmployerPage />} />
           <Route path="/admin/login" element={<AdminLoginPage />} />
-          <Route path="/admin" element={<AdminPage />} />
+          <Route element={<LayoutAdmin />}>
+            <Route path="/admin" element={<AdminDashboard />} />
+          </Route>
         </Routes>
       </BrowserRouter>
     </>
