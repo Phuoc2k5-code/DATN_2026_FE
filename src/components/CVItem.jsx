@@ -1,8 +1,10 @@
 import React from 'react';
-import { Trash2, FileEdit } from 'lucide-react';
+import { Trash2, FileEdit, LayoutTemplate } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+
 const CVItem = ({ cv, onEdit, onDelete }) => {
   const navigate = useNavigate();
+
   return (
     <div className="bg-white rounded-2xl p-5 border border-slate-150 shadow-sm hover:shadow-md transition-all duration-200 flex flex-col h-[320px] justify-between relative">
       
@@ -25,8 +27,8 @@ const CVItem = ({ cv, onEdit, onDelete }) => {
 
         {/* Cột phải: Thông tin tên tuổi, vị trí và các dòng gạch ngang mô tả */}
         <div className="flex-1 pt-1">
-          <h3 className="text-base font-bold text-slate-800 tracking-tight">{cv.name}</h3>
-          <p className="text-xs font-semibold text-slate-500 mt-0.5">{cv.title}</p>
+          <h3 className="text-base font-bold text-slate-800 tracking-tight truncate">{cv.name}</h3>
+          <p className="text-xs font-semibold text-slate-500 mt-0.5 truncate">{cv.title}</p>
           
           <div className="mt-4 space-y-2">
             <div className="w-full h-1.5 bg-slate-200 rounded"></div>
@@ -44,19 +46,35 @@ const CVItem = ({ cv, onEdit, onDelete }) => {
         </span>
       )}
 
-      {/* Bộ đôi nút Sửa và Xóa nằm sát đáy thẻ */}
-      <div className="mt-4 pt-3 border-t border-slate-100 flex gap-2">
+      {/* Bộ ba nút: Sửa, Đổi mẫu, và Xóa nằm sát đáy thẻ */}
+      <div className="mt-4 pt-3 border-t border-slate-100 flex items-center gap-2">
+        {/* Nút 1: Sửa nội dung */}
         <button
           onClick={() => navigate(`/edit-cv/${cv.id}`)}
-          className="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold py-2.5 px-4 rounded-xl transition-colors flex items-center justify-center gap-1"
+          className="flex-1 bg-slate-100 hover:bg-slate-200/80 text-slate-700 text-[11px] font-bold py-2 px-2.5 rounded-xl transition-colors flex items-center justify-center gap-1 active:scale-95 transform duration-150"
+          title="Chỉnh sửa nội dung thông tin CV"
         >
-          ✏️ Sửa
+          <FileEdit size={13} className="text-slate-500" />
+          Sửa nội dung
         </button>
+
+        {/* Nút 2 mới bổ sung: Đổi mẫu thiết kế riêng cho CV này */}
+        <button
+          onClick={() => navigate(`/candidate/preview-cv/${cv.id}`)}
+          className="flex-1 bg-orange-50 hover:bg-orange-100/70 text-orange-600 text-[11px] font-bold py-2 px-2.5 rounded-xl border border-orange-100/60 transition-colors flex items-center justify-center gap-1 active:scale-95 transform duration-150"
+          title="Thay đổi giao diện và mẫu thiết kế CV"
+        >
+          <LayoutTemplate size={13} className="text-orange-500" />
+          Đổi mẫu
+        </button>
+
+        {/* Nút 3: Xóa CV */}
         <button
           onClick={() => onDelete(cv.id)}
-          className="flex-1 bg-red-50 hover:bg-red-100 text-red-600 text-xs font-bold py-2.5 px-4 rounded-xl transition-colors flex items-center justify-center gap-1"
+          className="bg-red-50 hover:bg-red-100 text-red-600 p-2 rounded-xl border border-red-100 transition-colors flex items-center justify-center active:scale-95 transform duration-150"
+          title="Xóa hồ sơ này"
         >
-          🗑️ Xóa
+          <Trash2 size={14} />
         </button>
       </div>
 

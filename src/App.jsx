@@ -17,6 +17,7 @@ import CompanyDetail from './views/user/CompanyDetail';
 import AiJobs from './views/user/AIJobs';
 import CreateCV from './views/user/CreateCV';
 import UpdateCV from './views/user/CreateCV';
+import CVPreviewAndTemplate from './views/user/CVPreviewAndTemplate';
 // admin
 import AdminLoginPage from './views/auth/AdminLoginPage';
 import AdminPage from './views/admin/AdminPage';
@@ -41,6 +42,7 @@ function App() {
             <Route path="/ai-suggestions" element={<AiJobs />} />
             <Route path="/create-cv" element={<CreateCV />} />
             <Route path="/edit-cv/:id" element={<UpdateCV />} />
+            <Route path="/preview-cv/:id" element={<CVPreviewAndTemplate />} />
           </Route>
           <Route path="/employer" element={<EmployerPage />} />
           <Route path="/admin/login" element={<AdminLoginPage />} />
