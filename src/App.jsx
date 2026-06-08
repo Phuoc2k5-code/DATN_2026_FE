@@ -25,6 +25,10 @@ import AdminDashboard from './views/admin/AdminDashboard';
 import ReportManagement from './views/admin/ReportManagement';
 import UserManagement from './views/admin/UserManagement';
 import CVTemplateManagement from './views/admin/CVTemplateManagement';
+import CategoryManagement from './views/admin/CategoryManagement';
+import StatisticalReport from './views/admin/StatisticalReport';
+import SystemModeration from './views/admin/SystemModeration';
+
 // employer
 import EmployerPage from './views/employer/EmployerPage';
 
@@ -55,6 +59,9 @@ function App() {
             <Route path="/admin/reports" element={<ReportManagement />} />
             <Route path="/admin/users" element={<UserManagement />} />
             <Route path="/admin/cv-templates" element={<CVTemplateManagement />} />
+            <Route path="/admin/categories" element={<CategoryManagement />} />
+            <Route path="/admin/statistics" element={<StatisticalReport />} />
+           <Route path="/admin/moderation" element={<SystemModeration />} />
           </Route>
         </Routes>
       </BrowserRouter>
