@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
 import { Mail, Lock, ArrowRight, AlertCircle } from 'lucide-react';
 import AI_Nen from '../../assets/images/AI_Nen.png';
@@ -9,57 +10,64 @@ export default function LoginPage() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
-  
+
   const handleLogin = (e) => {
     e.preventDefault();
     setError('');
     setLoading(true);
 
-    // Gọi API đăng nhập kết nối với Laravel Backend
-    fetch('http://127.0.0.1:8000/api/login-user', {
-      method: 'POST',
-      headers: {  
+    // Cấu hình data gửi đi
+    const loginData = { email, password };
+
+    // Gọi API bằng axios sạch sẽ
+    axios.post('http://127.0.0.1:8000/api/login-user', loginData, {
+      headers: {
         'Content-Type': 'application/json',
-        // Gỡ bỏ Authorization thừa ở đây khi gửi request đăng nhập lần đầu
-      },
-      body: JSON.stringify({ email, password }),
-    })
-    .then(response => response.json())
-    .then(data => {
-      setLoading(false);
-      if (data.token && data.token !== '') {
-        localStorage.setItem('token', data.token);
-        localStorage.setItem('user', JSON.stringify(data.user));
-        
-        // Điều hướng thông minh dựa vào vai trò phân quyền
-        if (data.user.role === 'user') {
-          navigate('/'); 
-        } else if (data.user.role === 'employer') {
-          navigate('/employer'); 
-        } else {
-          setError('Vai trò người dùng không hợp lệ trên hệ thống.');
-        }
-      } else {
-        setError(data.message || 'Email hoặc mật khẩu không chính xác.');
+        'Accept': 'application/json' // Ép Laravel luôn phản hồi dạng JSON, không trả về HTML bậy bạ
       }
     })
-    .catch(error => {
-      setLoading(false);
-      console.error('Lỗi khi đăng nhập:', error);
-      setError('Kết nối máy chủ thất bại. Vui lòng kiểm tra lại backend Laravel.');
-    });
+      .then(response => {
+        setLoading(false);
+        const data = response.data;
+
+        if (data.token) {
+          // Lưu thông tin vào localStorage
+          localStorage.setItem('token', data.token);
+          localStorage.setItem('user', JSON.stringify(data.user));
+
+          // Điều hướng thông minh dựa vào vai trò phân quyền
+          if (data.user.role === 'candidate') {
+            navigate('/');
+          } else if (data.user.role === 'employer') {
+            navigate('/employer');
+          } else {
+            setError('Vai trò người dùng không hợp lệ trên hệ thống.');
+          }
+        }
+      })
+      .catch(err => {
+        setLoading(false);
+        console.error('Lỗi khi đăng nhập:', err);
+
+        // 💡 AXIOS CỨU CÁNH: Lấy đúng nội dung lỗi từ Backend Laravel trả về
+        if (err.response && err.response.data) {
+          setError(err.response.data.message || 'Đăng nhập thất bại. Vui lòng thử lại.');
+        } else {
+          setError('Kết nối máy chủ thất bại. Vui lòng kiểm tra lại backend Laravel.');
+        }
+      });
   };
 
   return (
     <div className="flex items-center justify-center min-h-screen bg-slate-50 p-4 sm:p-6">
       <div className="flex w-full max-w-4xl bg-white rounded-2xl shadow-sm border border-slate-200/80 overflow-hidden min-h-[550px]">
-        
+
         {/* LỚP ĐỒ HỌA BÊN TRÁI: Tông xanh trắng hiện đại (Chỉ hiển thị từ màn hình md) */}
         <div className="hidden md:flex md:w-1/2 bg-gradient-to-br from-blue-600 via-blue-500 to-indigo-600 p-10 flex-col justify-between relative overflow-hidden">
           {/* Các vòng tròn trang trí mờ tạo chiều sâu */}
           <div className="absolute -top-10 -left-10 w-40 h-40 bg-white/10 rounded-full blur-2xl"></div>
           <div className="absolute -bottom-20 -right-10 w-60 h-60 bg-white/10 rounded-full blur-3xl"></div>
-          
+
           {/* Logo / Tên hệ thống */}
           <div className="flex items-center gap-2 relative z-10">
             <div className="w-8 h-8 rounded-lg bg-white flex items-center justify-center shadow-sm">
@@ -70,9 +78,9 @@ export default function LoginPage() {
 
           {/* Hình ảnh minh họa vector không gian làm việc chuyên nghiệp */}
           <div className="flex items-center justify-center my-auto relative z-10">
-            <img 
-              src={AI_Nen} 
-              alt="Tuyển dụng thông minh" 
+            <img
+              src={AI_Nen}
+              alt="Tuyển dụng thông minh"
               className="w-4/5 object-contain rounded-xl mix-blend-luminosity"
             />
           </div>
@@ -87,13 +95,13 @@ export default function LoginPage() {
         {/* KHỐI FORM NHẬP LIỆU BÊN PHẢI: Tông trắng tinh tế */}
         <div className="w-full p-8 md:w-1/2 lg:p-12 flex flex-col justify-center bg-white">
           <div className="max-w-md w-full mx-auto">
-            
+
             {/* Tiêu đề chào mừng */}
             <div className="mb-8">
               <h2 className="text-2xl font-bold text-slate-800">Chào mừng bạn trở lại!</h2>
               <p className="text-slate-400 text-xs mt-1">Vui lòng đăng nhập tài khoản để tiếp tục truy cập hệ thống.</p>
             </div>
-            
+
             {/* Hộp thông báo lỗi động */}
             {error && (
               <div className="flex items-center gap-2 p-3.5 mb-5 bg-rose-50 border border-rose-200 text-rose-700 rounded-xl text-xs font-medium animate-shake">
@@ -104,7 +112,7 @@ export default function LoginPage() {
 
             {/* Form xử lý thông tin */}
             <form onSubmit={handleLogin} className="space-y-4">
-              
+
               {/* Ô nhập Email */}
               <div className="space-y-1">
                 <label htmlFor="email" className="block text-left text-xs font-semibold text-slate-600">Địa chỉ Email</label>
@@ -121,7 +129,7 @@ export default function LoginPage() {
                   />
                 </div>
               </div>
-              
+
               {/* Ô nhập Mật khẩu */}
               <div className="space-y-1">
                 <div className="flex items-center justify-between">

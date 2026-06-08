@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 
-const ReportManagement = () => {
+export default function ReportManagement() {
   const initialReports = [
     {
       id: 'RP001',
@@ -78,7 +78,7 @@ const ReportManagement = () => {
   };
 
   return (
-    <div className="p-8 bg-slate-50 min-h-screen font-sans text-slate-800">
+    <div className="bg-slate-50 min-h-screen font-sans text-slate-800">
       
       {/* Header Section */}
       <div className="mb-8 flex flex-col md:flex-row md:items-center justify-between gap-4">
@@ -173,5 +173,3 @@ const ReportManagement = () => {
     </div>
   );
 };
-
-export default ReportManagement;

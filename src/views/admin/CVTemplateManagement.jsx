@@ -12,7 +12,7 @@ import {
   AlertCircle
 } from 'lucide-react';
 
-const CvTemplateManagement = () => {
+export default function CvTemplateManagement() {
   // Dữ liệu mẫu CV giả lập (Có hình ảnh minh họa, danh mục, trạng thái)
   const initialTemplates = [
     {
@@ -74,7 +74,7 @@ const CvTemplateManagement = () => {
   );
 
   return (
-    <div className="p-8 bg-slate-50 min-h-screen font-sans text-slate-800">
+    <div className="bg-slate-50 min-h-screen font-sans text-slate-800">
       
       {/* Header Section */}
       <div className="mb-8 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -269,5 +269,3 @@ const CvTemplateManagement = () => {
     </div>
   );
 };
-
-export default CvTemplateManagement;
