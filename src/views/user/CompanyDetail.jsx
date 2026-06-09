@@ -12,7 +12,7 @@ import ReportModal from '../../components/ReportModal'; // Component ReportModal
 export default function CompanyDetails() {
   const { id } = useParams(); // Lấy ID công ty từ URL (Ví dụ: /companies/1)
 
-  // 🚀 QUAN TRỌNG: Quản lý trạng thái dữ liệu API và trạng thái giao diện sạch sẽ
+  // 🚀 Quản lý trạng thái dữ liệu API và trạng thái giao diện sạch sẽ
   const [companyData, setCompanyData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -23,7 +23,7 @@ export default function CompanyDetails() {
     setError(null);
     setLoading(true);
     try {
-      // Gọi chính xác tới Route Backend Laravel mà anh em mình vừa thống nhất viết ở trên
+      // Gọi chính xác tới Route Backend Laravel
       const response = await axios.get(`http://127.0.0.1:8000/api/companies/${id}`);
       if (response.data.success) {
         setCompanyData(response.data.data);
@@ -34,7 +34,7 @@ export default function CompanyDetails() {
       console.error("Error fetching company details:", err);
       setError(err.response?.data?.message || 'Đã xảy ra lỗi kết nối với máy chủ.');
     } finally {
-      setLoading(false);
+      loading && setLoading(false);
     }
   };
 
@@ -46,30 +46,37 @@ export default function CompanyDetails() {
     }
   }, [id]);
 
-  // HÀM TIỆN ÍCH: Biến chuỗi văn bản mô tả phúc lợi (đầu vào từ DB viết xuống dòng) thành mảng để map đẹp mắt
+  // HÀM TIỆN ÍCH: Biến chuỗi văn bản mô tả phúc lợi thành mảng để map đẹp mắt
   const parseBenefitsToList = (text) => {
     if (!text) {
-      // Nếu DB không có cột phúc lợi riêng, trả về mảng mặc định cho giao diện không bị trống
       return [
         { title: "Môi trường làm việc hiện đại", desc: "Không gian mở sáng tạo, kích thích tư duy phát triển tối đa." },
         { title: "Chế độ đãi ngộ cạnh tranh", desc: "Lương thưởng hấp dẫn tương xứng với năng lực thực tế." }
       ];
     }
-    // Logic tách dòng tự động (nếu bro lưu chuỗi text dài từ Laravel)
+    
+    // Logic tự động bóc tách dòng dựa trên dấu xuống dòng \n
     return text.split('\n').map((item, idx) => {
+      if (!item.trim()) return null;
       const parts = item.split(':');
+      if (parts.length > 1) {
+        return {
+          title: parts[0]?.trim(),
+          desc: parts.slice(1).join(':')?.trim()
+        };
+      }
       return {
-        title: parts[0]?.trim() || `Phúc lợi ${idx + 1}`,
-        desc: parts[1]?.trim() || "Chi tiết chế độ đãi ngộ đang được áp dụng."
+        title: `Chế độ đãi ngộ ${idx + 1}`,
+        desc: item.trim()
       };
-    });
+    }).filter(Boolean);
   };
 
   // HÀM XỬ LÝ MỞ MODAL BÁO CÁO (Chống nổi bọt)
   const handleOpenReport = (e) => {
     e.preventDefault();
     e.stopPropagation();
-    setIsOpenReport(true);
+    isOpenReport || setIsOpenReport(true);
   };
 
   // TRẠNG THÁI 1: ĐANG TẢI DỮ LIỆU SẠCH SẼ
@@ -96,19 +103,19 @@ export default function CompanyDetails() {
     );
   }
 
-  // 🚀 ĐỒNG BỘ MAPPING BIẾN TỪ LARAVEL JSON RESPONSE
+  // 🚀 ĐỒNG BỘ CHUẨN MAPPING TÊN BIẾN TỪ CƠ SỞ DỮ LIỆU LARAVEL
   const companyName = companyData.company_name || 'Doanh nghiệp tuyển dụng';
   const logoBgColor = companyData.logoBg || 'bg-gradient-to-br from-orange-500 to-amber-600';
-  const companyWebsite = companyData.website || 'https://vieclampro.vn';
-  const companyLocation = companyData.location || 'Đang cập nhật địa chỉ';
+  const companyWebsite = companyData.website_url || 'https://vieclampro.vn'; // Sửa từ .website -> .website_url
+  const companyLocation = companyData.address || 'Đang cập nhật địa chỉ';     // Sửa từ .location -> .address
   const companyAbout = companyData.description || 'Thông tin giới thiệu về doanh nghiệp đang được cập nhật.';
   const companyIndustry = companyData.industry || 'Chưa phân loại lĩnh vực';
-  const companyScale = companyData.scale || 'Đang cập nhật quy mô';
-  const companyFounded = companyData.founded_in || 'Đang cập nhật';
+  const companyScale = companyData.size || 'Đang cập nhật quy mô';             // Sửa từ .scale -> .size
+  const companyFounded = companyData.founded_year || 'Đang cập nhật';          // Sửa từ .founded_in -> .founded_year
   
-  // Tách mảng phúc lợi từ dữ liệu DB (hoặc dùng hàm tiện ích đã map sẵn ở trên)
+  // Tách mảng phúc lợi từ dữ liệu thực tế trong DB
   const benefitsList = parseBenefitsToList(companyData.benefits);
-  // Danh sách các tin tuyển dụng của riêng công ty này (được Laravel eager load thông qua $company->jobs)
+  // Danh sách các tin tuyển dụng của riêng công ty này (Eager load thông qua quan hệ $company->jobs)
   const activeJobsList = companyData.jobs || [];
 
   return (
@@ -130,7 +137,7 @@ export default function CompanyDetails() {
             {/* Vùng bên trái: Thông tin thương hiệu */}
             <div className="flex flex-col md:flex-row items-center md:items-end gap-5 w-full md:w-auto">
               
-              {/* Logo viết tắt chữ đầu lấy từ ký tự đầu tiên của tên công ty trên DB */}
+              {/* Logo viết tắt lấy từ ký tự đầu tiên của tên công ty */}
               <div className={`w-20 h-20 sm:w-24 sm:h-24 rounded-2xl ${logoBgColor} text-white font-black text-3xl sm:text-4xl flex items-center justify-center shadow-md border-4 border-orange-100/50 shrink-0`}>
                 {companyName.charAt(0)}
               </div>
@@ -138,7 +145,9 @@ export default function CompanyDetails() {
               <div className="space-y-2 flex-1 w-full">
                 <h1 className="text-xl sm:text-2xl font-extrabold tracking-tight flex items-center justify-center md:justify-start gap-2 bg-gradient-to-r from-orange-600 to-amber-600 bg-clip-text text-transparent">
                   {companyName}
-                  <ShieldCheck size={18} className="text-emerald-500 fill-emerald-50" title="Doanh nghiệp đã xác thực" />
+                  {companyData.is_verified === 1 && (
+                    <ShieldCheck size={18} className="text-emerald-500 fill-emerald-50" title="Doanh nghiệp đã xác thực" />
+                  )}
                 </h1>
                 
                 <p className="text-xs sm:text-sm italic text-slate-500 font-medium max-w-2xl mx-auto md:mx-0">
@@ -164,7 +173,7 @@ export default function CompanyDetails() {
                 onClick={handleOpenReport}
                 className="w-full md:w-auto justify-center px-4 py-2.5 rounded-xl border border-slate-200 bg-white hover:bg-rose-50 hover:border-rose-200 text-slate-500 hover:text-rose-600 font-semibold text-xs flex items-center gap-1.5 transition-all shadow-xs"
               >
-                <AlertTriangle size={13} className="text-slate-400 group-hover:text-rose-500" />
+                <AlertTriangle size={13} className="text-slate-400" />
                 <span>Báo cáo doanh nghiệp</span>
               </button>
             </div>
@@ -216,13 +225,12 @@ export default function CompanyDetails() {
               {activeJobsList.length > 0 ? (
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   {activeJobsList.map((job) => (
-                    // Truyền object job sạch gọi từ DB vào Component dùng chung của bro
                     <Job key={job.id} job={{
                       id: job.id,
                       title: job.title,
-                      company: companyName, // Kế thừa tên công ty cha
-                      location: job.location,
-                      salary: job.is_negotiable ? 'Thỏa thuận' : `${parseInt(job.salary_min).toLocaleString()} - ${parseInt(job.salary_max).toLocaleString()} VNĐ`,
+                      company: companyName, 
+                      location: job.location || companyLocation, // Dự phòng lấy địa chỉ công ty nếu job trống
+                      salary: job.is_negotiable ? 'Thỏa thuận' : `${parseInt(job.salary_min || 0).toLocaleString()} - ${parseInt(job.salary_max || 0).toLocaleString()} VNĐ`,
                       logoBg: logoBgColor,
                       tags: job.tags || ["Tuyển gấp"]
                     }} />

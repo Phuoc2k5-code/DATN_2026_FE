@@ -1,25 +1,33 @@
-import React, { useState } from 'react';
-import { Link } from 'react-router-dom';
+import React, { useState, useEffect } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
+import axios from 'axios';
 import {
   User, Lock, LogOut, Camera, ShieldCheck,
   Mail, Phone, MapPin, Briefcase, Calendar, Save, Edit3, X, ArrowLeft
 } from 'lucide-react';
 
 export default function UserProfile() {
-  const [activeTab, setActiveTab] = useState('info'); // 'info' hoặc 'password'
-  const [isEditing, setIsEditing] = useState(false);  // 💡 Trạng thái khóa/mở khóa chỉnh sửa
+  const navigate = useNavigate();
+  const [activeTab, setActiveTab] = useState('info');
+  const [isEditing, setIsEditing] = useState(false);
+  const [loading, setLoading] = useState(true);
 
-  const initialUserInfo = {
-    fullName: 'Nguyễn Văn A',
-    email: 'Anguyen@gmail.com',
-    phone: '0987654321',
-    address: 'Quận 9, TP. Hồ Chí Minh',
-    title: 'Frontend Developer',
-    dob: '2004-10-15',
+  // State lưu trữ thông tin hiển thị trên Form
+  const [userInfo, setUserInfo] = useState({
+    fullName: '',
+    email: '',
+    phone: '',
+    address: '',
+    title: '',
+    dob: '',
     avatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150'
-  };
+  });
 
-  const [userInfo, setUserInfo] = useState(initialUserInfo);
+  // 💡 BỔ SUNG: State lưu trữ file ảnh thực tế khi người dùng chọn từ máy tính
+  const [avatarFile, setAvatarFile] = useState(null);
+
+  // State dùng để backup dữ liệu cũ (khi người dùng bấm nút "Hủy bỏ")
+  const [backupUserInfo, setBackupUserInfo] = useState({});
 
   const [passwordData, setPasswordData] = useState({
     currentPassword: '',
@@ -27,104 +35,245 @@ export default function UserProfile() {
     confirmPassword: ''
   });
 
-  // Hàm xử lý thay đổi dữ liệu thông tin cá nhân
+  const token = localStorage.getItem('token');
+  const apiConfig = {
+    headers: { 
+      'Authorization': token ? `Bearer ${token}` : '',
+      'Accept': 'application/json' 
+    }
+  };
+
+  // 1. GỌI API (GET) LẤY THÔNG TIN PROFILE KHI TẢI TRANG
+  useEffect(() => {
+    const fetchProfile = async () => {
+      try {
+        setLoading(true);
+        const response = await axios.get('http://127.0.0.1:8000/api/user-profile', apiConfig);
+        
+        if (response.data.success) {
+          const uData = response.data.data;
+          const profileFetched = {
+            fullName: uData.candidate?.full_name || '',
+            email: uData.email || '',
+            phone: uData.candidate?.phone || '',
+            address: uData.candidate?.address || '',
+            title: uData.candidate?.title || '',
+            dob: uData.candidate?.birthday || '',
+            // Kiểm tra link ảnh từ DB, bọc lót nếu rỗng
+            avatar: uData.candidate?.avatar_url 
+              ? `http://127.0.0.1:8000/${uData.candidate.avatar_url}`
+              : 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150'
+          };
+          setUserInfo(profileFetched);
+          setBackupUserInfo(profileFetched);
+        }
+      } catch (error) {
+        console.error("Lỗi lấy thông tin tài khoản:", error);
+        if (error.response?.status === 401) {
+          alert("Phiên đăng nhập đã hết hạn, vui lòng đăng nhập lại.");
+          navigate('/login');
+        }
+      } finally {
+        setLoading(false);
+      }
+    };
+    window.scrollTo(0, 0);
+    fetchProfile();
+  }, []);
+
   const handleInfoChange = (e) => {
     const { name, value } = e.target;
     setUserInfo(prev => ({ ...prev, [name]: value }));
   };
 
-  // Hàm xử lý thay đổi dữ liệu mật khẩu
+  // 💡 BỔ SUNG: Hàm xử lý thay đổi ảnh đại diện (Tạo URL Xem trước cục bộ)
+  const handleAvatarChange = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      // Kiểm tra dung lượng file (Giới hạn tối đa 5MB theo tài liệu phi chức năng)
+      if (file.size > 5 * 1024 * 1024) {
+        alert("Dung lượng ảnh đại diện không được vượt quá 5MB!");
+        return;
+      }
+      
+      setAvatarFile(file); // Lưu file thực tế để gửi lên server sau này
+      setUserInfo(prev => ({
+        ...prev,
+        avatar: URL.createObjectURL(file) // Tạo đường dẫn tạm thời hiển thị ngay lập tức lên giao diện
+      }));
+    }
+  };
+
   const handlePasswordChange = (e) => {
     const { name, value } = e.target;
     setPasswordData(prev => ({ ...prev, [name]: value }));
   };
 
-  // Hàm Lưu thông tin cá nhân
-  const handleSaveInfo = (e) => {
+  // 2. GỌI API (POST) LƯU THÔNG TIN CÁ NHÂN & CHUYỂN ĐỔI SANG FORMDATA
+  const handleSaveInfo = async (e) => {
     e.preventDefault();
-    alert('Cập nhật thông tin tài khoản thành công!');
-    setIsEditing(false); // 💡 Lưu xong thì khóa form lại ngay
+    try {
+      // Vì hệ thống cần xử lý tệp tin tải lên, ta bắt buộc sử dụng FormData thay cho đối tượng JSON phẳng
+      const formData = new FormData();
+      formData.append('full_name', userInfo.fullName);
+      formData.append('phone', userInfo.phone);
+      formData.append('title', userInfo.title);
+      formData.append('address', userInfo.address);
+      formData.append('birthday', userInfo.dob);
+      formData.append('gender', 'Khác');
+
+      // Nếu người dùng có chọn ảnh mới, đính kèm tệp file vào request body
+      if (avatarFile) {
+        formData.append('avatar', avatarFile);
+      }
+
+      // Cấu hình Header đặc thù cho việc Upload file
+      const uploadConfig = {
+        headers: {
+          ...apiConfig.headers,
+          'Content-Type': 'multipart/form-data'
+        }
+      };
+
+      const response = await axios.post('http://127.0.0.1:8000/api/user-profile/update', formData, uploadConfig);
+
+      if (response.data.success) {
+        alert(response.data.message);
+        
+        // Cập nhật lại đường dẫn ảnh chính thức từ Laravel trả về (nếu có)
+        if (response.data.data?.avatar_url) {
+          setUserInfo(prev => ({
+            ...prev,
+            avatar: `http://127.0.0.1:8000/${response.data.data.avatar_url}`
+          }));
+        }
+        
+        setBackupUserInfo(userInfo);
+        setAvatarFile(null); // Reset trạng thái file
+        setIsEditing(false);
+      }
+    } catch (error) {
+      console.error("Lỗi lưu hồ sơ:", error);
+      alert(error.response?.data?.message || "Có lỗi xảy ra khi cập nhật thông tin.");
+    }
   };
 
-  // Hàm Hủy chỉnh sửa (Khôi phục lại dữ liệu ban đầu)
   const handleCancelEdit = () => {
-    setUserInfo(initialUserInfo); // Trả lại dữ liệu cũ
-    setIsEditing(false);          // Khóa form lại
+    setUserInfo(backupUserInfo); // Khôi phục lại dữ liệu gốc trước khi nhấn sửa
+    setAvatarFile(null); // Hủy tệp tin đang chọn lửng lơ
+    setIsEditing(false);
   };
 
-  // Hàm Lưu đổi mật khẩu
-  const handleSavePassword = (e) => {
+  const handleSavePassword = async (e) => {
     e.preventDefault();
     if (passwordData.newPassword !== passwordData.confirmPassword) {
       alert('Mật khẩu nhập lại không trùng khớp!');
       return;
     }
-    alert('Đổi mật khẩu thành công!');
-    setPasswordData({ currentPassword: '', newPassword: '', confirmPassword: '' });
-  };
+    
+    try {
+      const response = await axios.post('http://127.0.0.1:8000/api/user-password/update', {
+        current_password: passwordData.currentPassword,
+        new_password: passwordData.newPassword
+      }, apiConfig);
 
-  // Hàm Đăng xuất
-  const handleLogout = () => {
-    if (window.confirm('Bạn có chắc chắn muốn đăng xuất tài khoản?')) {
-      alert('Đã đăng xuất hệ thống!');
+      if (response.data.success) {
+        alert('Đổi mật khẩu thành công!');
+        setPasswordData({ currentPassword: '', newPassword: '', confirmPassword: '' });
+      }
+    } catch (error) {
+      alert(error.response?.data?.message || "Mật khẩu hiện tại không chính xác.");
     }
   };
 
+  const handleLogout = () => {
+    if (window.confirm('Bạn có chắc chắn muốn đăng xuất tài khoản?')) {
+      localStorage.removeItem('token');
+      alert('Đã đăng xuất hệ thống!');
+      navigate('/login');
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-[#FFFDF9] flex items-center justify-center font-bold text-slate-500 text-xs">
+        Đang tải thông tin hồ sơ...
+      </div>
+    );
+  }
+
   return (
-    // 💡 ĐỒNG BỘ: Giữ màu nền ấm nhã nhặn #FFFDF9 của hệ thống
     <div className="min-h-screen bg-[#FFFDF9] font-sans text-slate-800 antialiased pb-16 w-full">
 
-      {/* 🚀 HEADER TÀI KHOẢN ĐỒNG BỘ ĐEN - XANH CÔNG NGHỆ (GRADIENT) */}
+      {/* HEADER TÀI KHOẢN */}
       <div className="w-full bg-gradient-to-br from-orange-100/60 via-amber-100/40 to-white text-slate-800 px-4 sm:px-6 lg:px-8 py-10 border-b border-orange-100/70 shadow-sm">
-  <div className="max-w-6xl mx-auto">
-    
-    {/* Nút quay lại trang chủ - Đổi hover sang màu cam chủ đạo và font font-semibold đồng bộ */}
-    <Link to="/" className="flex items-center gap-1.5 text-xs font-semibold text-slate-500 hover:text-orange-500 transition-colors mb-5 group w-fit">
-      <ArrowLeft size={14} className="group-hover:-translate-x-0.5 transition-transform" /> 
-      Quay lại trang chủ
-    </Link>
+        <div className="max-w-6xl mx-auto">
+          
+          <Link to="/" className="flex items-center gap-1.5 text-xs font-semibold text-slate-500 hover:text-orange-500 transition-colors mb-5 group w-fit">
+            <ArrowLeft size={14} className="group-hover:-translate-x-0.5 transition-transform" /> 
+            Quay lại trang chủ
+          </Link>
 
-    <div className="flex flex-col sm:flex-row items-center gap-5">
-      {/* Khối Avatar ứng viên */}
-      <div className="relative group cursor-pointer shrink-0">
-        <img
-          src={userInfo.avatar}
-          alt={userInfo.fullName}
-          className="w-20 h-20 sm:w-24 sm:h-24 rounded-full object-cover border-4 border-orange-200/60 shadow-md group-hover:opacity-80 transition-opacity"
-        />
-        {isEditing && (
-          /* Nền overlay chỉnh thành màu cam/đen nhẹ nhàng */
-          <div className="absolute inset-0 bg-orange-900/20 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity backdrop-blur-xs">
-            <Camera size={18} className="text-white drop-shadow-sm" />
+          <div className="flex flex-col sm:flex-row items-center gap-5">
+            
+            {/* VÙNG AVATAR ĐÃ ĐƯỢC NÂNG CẤP CHỨC NĂNG SỬA */}
+            <div className="relative group shrink-0">
+              <img
+                src={userInfo.avatar}
+                alt={userInfo.fullName}
+                className={`w-20 h-20 sm:w-24 sm:h-24 rounded-full object-cover border-4 border-orange-200/60 shadow-md transition-all ${
+                  isEditing ? 'cursor-pointer hover:opacity-80 group-hover:border-blue-300' : 'cursor-default'
+                }`}
+                onError={(e) => {
+                  e.target.onerror = null;
+                  e.target.src = "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150";
+                }}
+                onClick={() => isEditing && document.getElementById('avatarInput').click()}
+              />
+              
+              {isEditing && (
+                <div 
+                  onClick={() => document.getElementById('avatarInput').click()}
+                  className="absolute inset-0 bg-black/40 rounded-full flex flex-col items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer text-white text-[10px] font-bold gap-1"
+                >
+                  <Camera size={16} className="text-white drop-shadow-sm" />
+                  <span>Thay ảnh</span>
+                </div>
+              )}
+
+              {/* Input file ẩn phục vụ việc kích hoạt chọn file */}
+              <input 
+                type="file" 
+                id="avatarInput" 
+                accept="image/*" 
+                className="hidden" 
+                onChange={handleAvatarChange}
+                disabled={!isEditing}
+              />
+            </div>
+            
+            <div className="text-center sm:text-left space-y-1">
+              <h1 className="text-xl sm:text-2xl font-extrabold tracking-tight bg-gradient-to-r from-orange-600 to-amber-600 bg-clip-text text-transparent">
+                {userInfo.fullName || "Chưa cập nhật tên"}
+              </h1>
+              
+              <p className="text-xs sm:text-sm font-medium text-slate-500 flex items-center justify-center sm:justify-start gap-1">
+                <Briefcase size={14} className="text-slate-400" /> {userInfo.title || "Vị trí chưa cập nhật"}
+              </p>
+              
+              <span className="inline-flex items-center gap-1 bg-orange-100/70 text-orange-700 text-[10px] font-bold px-2.5 py-0.5 rounded-xl mt-1.5 border border-orange-200/40 shadow-xs">
+                <ShieldCheck size={11} className="text-emerald-600 fill-emerald-100" /> Tài khoản đã xác thực
+              </span>
+            </div>
           </div>
-        )}
+        </div>
       </div>
-      
-      {/* Khối Thông tin tên & Chức danh */}
-      <div className="text-center sm:text-left space-y-1">
-        {/* Tiêu đề tên ứng viên đổi từ !text-blue-600 sang chữ chuyển màu Gradient Cam - Hổ phách giống hệt các trang trước */}
-        <h1 className="text-xl sm:text-2xl font-extrabold tracking-tight bg-gradient-to-r from-orange-600 to-amber-600 bg-clip-text text-transparent">
-          {userInfo.fullName}
-        </h1>
-        
-        <p className="text-xs sm:text-sm font-medium text-slate-500 flex items-center justify-center sm:justify-start gap-1">
-          <Briefcase size={14} className="text-slate-400" /> {userInfo.title}
-        </p>
-        
-        {/* Nhãn xác thực tài khoản - Chuyển sang nền cam nhạt, chữ cam đậm cực kỳ chuyên nghiệp */}
-        <span className="inline-flex items-center gap-1 bg-orange-100/70 text-orange-700 text-[10px] font-bold px-2.5 py-0.5 rounded-xl mt-1.5 border border-orange-200/40 shadow-xs">
-          <ShieldCheck size={11} className="text-emerald-600 fill-emerald-100" /> Tài khoản đã xác thực
-        </span>
-      </div>
-    </div>
-  </div>
-</div>
 
       {/* VÙNG NỘI DUNG CHÍNH CHIA BIỆT LẬP 2 BÊN */}
       <main className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 mt-8">
         <div className="grid grid-cols-1 md:grid-cols-4 gap-6 items-start w-full">
 
-          {/* THANH ĐIỀU HƯỚNG BÊN TRÁI (SIDEBAR TAB) - Chuẩn hóa các bo góc tròn lớn 2xl */}
+          {/* SIDEBAR TAB */}
           <div className="md:col-span-1 bg-white border border-slate-200/80 rounded-2xl p-3 shadow-sm space-y-1 shrink-0">
             <button
               onClick={() => setActiveTab('info')}
@@ -167,10 +316,9 @@ export default function UserProfile() {
                 <div className="flex items-start justify-between gap-4">
                   <div>
                     <h3 className="text-sm font-black text-slate-800 tracking-tight">Thông tin người dùng</h3>
-                    <p className="text-[11px] text-slate-400">Xem hoặc chỉnh sửa thông tin hồ sơ cá nhân của bạn.</p>
+                    <p className="text-[11px] text-slate-400">Xem hoặc chỉnh sửa thông tin hồ sơ cá nhân và ảnh đại diện.</p>
                   </div>
 
-                  {/* 💡 SỬA ĐỒNG BỘ: Chuyển nút màu Blue nền sáng sang bo tròn xl đồng điệu */}
                   {!isEditing && (
                     <button
                       type="button"
@@ -182,7 +330,6 @@ export default function UserProfile() {
                   )}
                 </div>
 
-                {/* Grid Input Form */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="space-y-1.5">
                     <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wide">
@@ -288,7 +435,6 @@ export default function UserProfile() {
                   </div>
                 </div>
 
-                {/* Cụm nút Lưu / Hủy khi mở khóa chỉnh sửa */}
                 {isEditing && (
                   <div className="pt-2 flex justify-end gap-2">
                     <button

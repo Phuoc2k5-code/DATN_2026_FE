@@ -28,6 +28,7 @@ import CVTemplateManagement from './views/admin/CVTemplateManagement';
 // employer
 import EmployerPage from './views/employer/EmployerPage';
 
+import ElegantCVTemplate from './components/CV_template/ElegantCVTemplate'
 
 function App() {
   return (
@@ -56,6 +57,8 @@ function App() {
             <Route path="/admin/users" element={<UserManagement />} />
             <Route path="/admin/cv-templates" element={<CVTemplateManagement />} />
           </Route>
+          <Route path='/cv-template' element={<ElegantCVTemplate/>}/>
+
         </Routes>
       </BrowserRouter>
     </>

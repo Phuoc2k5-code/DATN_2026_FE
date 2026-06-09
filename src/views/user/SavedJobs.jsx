@@ -44,6 +44,7 @@ export default function SavedJobs() {
 
   // 🚀 QUAN TRỌNG: Tự động chạy hàm gọi dữ liệu khi người dùng vừa truy cập vào trang này
   useEffect(() => {
+    window.scrollTo(0, 0);
     fetchSaveJobs();
   }, []);
 

@@ -1,31 +1,68 @@
 import { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { LogOut, User, History, FileText } from "lucide-react";
+import axios from "axios";
+import { LogOut, User, History } from "lucide-react";
 
 export default function Header() {
   const navigate = useNavigate();
   const [currentUser, setCurrentUser] = useState(null);
   const [isOpenDropdown, setIsOpenDropdown] = useState(false);
 
-  // Kiểm tra trạng thái đăng nhập từ localStorage mỗi khi Header được mount
+  // 1. GỌI API LẤY THÔNG TIN PROFILE MỚI NHẤT KHI HEADER ĐƯỢC MOUNT
   useEffect(() => {
-    const userString = localStorage.getItem("user");
-    if (userString) {
-      try {
-        setCurrentUser(JSON.parse(userString));
-      } catch (e) {
-        console.error("Lỗi đọc dữ liệu user từ localStorage", e);
-      }
+    const token = localStorage.getItem("token");
+    
+    // Nếu không có token, hiểu là chưa đăng nhập -> không cần gọi API
+    if (!token) {
+      setCurrentUser(null);
+      return;
     }
-  }, []);
 
-  // Hàm xử lý Đăng xuất
+    const fetchHeaderProfile = async () => {
+      try {
+        const response = await axios.get("http://127.0.0.1:8000/api/user-profile", {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            Accept: "application/json",
+          },
+        });
+
+        if (response.data.success) {
+          const uData = response.data.data;
+          
+          // Đồng bộ và gán gọn lại các trường cần thiết để hiển thị trên Header
+          setCurrentUser({
+            name: uData.candidate?.full_name || "Thành viên",
+            email: uData.email,
+            // Xử lý link ảnh từ DB, bọc lót nếu rỗng
+            avatar: uData.candidate?.avatar_url
+              ? `http://127.0.0.1:8000/${uData.candidate.avatar_url}`
+              : "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150",
+          });
+        }
+      } catch (error) {
+        console.error("Lỗi lấy thông tin profile tại Header:", error);
+        // Nếu token hết hạn hoặc lỗi 401, xóa token cũ và đưa về trạng thái chưa đăng nhập
+        if (error.response?.status === 401) {
+          localStorage.removeItem("token");
+          localStorage.removeItem("user");
+          setCurrentUser(null);
+        }
+      }
+    };
+
+    fetchHeaderProfile();
+  }, [navigate]);
+
+  // 2. HÀM XỬ LÝ ĐĂNG XUẤT
   const handleLogout = () => {
-    localStorage.removeItem("token");
-    localStorage.removeItem("user");
-    setCurrentUser(null);
-    setIsOpenDropdown(false);
-    navigate("/login"); // Đá user về trang login
+    if (window.confirm("Bạn có chắc chắn muốn đăng xuất?")) {
+      localStorage.removeItem("token");
+      localStorage.removeItem("user");
+      setCurrentUser(null);
+      setIsOpenDropdown(false);
+      navigate("/login"); // Đá user về trang login
+    }
   };
 
   return (
@@ -51,27 +88,31 @@ export default function Header() {
         {/* KHỐI XỬ LÝ ĐĂNG NHẬP / AVATAR */}
         <div className="flex items-center gap-2.5 relative">
           {currentUser ? (
-            /* TRẠNG THÁI 1: ĐÃ ĐĂNG NHẬP -> HIỂN THỊ AVATAR HOẶC TÊN */
+            /* TRẠNG THÁI 1: ĐÃ ĐĂNG NHẬP -> HIỂN THỊ AVATAR VÀ TÊN LẤY TỪ API */
             <div className="relative">
               <button 
                 onClick={() => setIsOpenDropdown(!isOpenDropdown)}
                 className="flex items-center gap-2 p-1 pr-3 rounded-full hover:bg-slate-100 transition cursor-pointer outline-none select-none border border-slate-100"
               >
-                {/* Ảnh đại diện (Nếu user dưới DB chưa có avatar thì lấy ảnh mặc định của UI) */}
+                {/* Ảnh đại diện an toàn */}
                 <img 
-                  src={currentUser.avatar || "https://api.dicebear.com/7.x/adventurer/svg?seed=Felix"} 
+                  src={currentUser.avatar} 
                   alt={currentUser.name} 
                   className="w-8 h-8 rounded-full object-cover bg-blue-50 border border-blue-200"
+                  // 💡 BẢO VỆ: Nếu ảnh từ server bị lỗi đường dẫn vật lý, tự thay bằng ảnh dự phòng online ngay
+                  onError={(e) => {
+                    e.target.onerror = null;
+                    e.target.src = "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150";
+                  }}
                 />
                 <span className="text-xs font-bold text-slate-700 hidden sm:inline-block max-w-[120px] truncate">
-                  {currentUser.name || "Thành viên"}
+                  {currentUser.name}
                 </span>
               </button>
 
               {/* DROPDOWN MENU KHI BẤM VÀO AVATAR */}
               {isOpenDropdown && (
                 <>
-                  {/* Lớp overlay ảo chống click nhầm ra ngoài */}
                   <div className="fixed inset-0 z-10" onClick={() => setIsOpenDropdown(false)}></div>
                   
                   <div className="absolute right-0 mt-2 w-48 bg-white rounded-xl shadow-lg border border-slate-100 py-1.5 z-20 animate-fade-in">
@@ -90,7 +131,7 @@ export default function Header() {
                     </Link>
 
                     <Link 
-                      to="/application-history" 
+                      to="/applied-history" 
                       onClick={() => setIsOpenDropdown(false)}
                       className="flex items-center gap-2 px-4 py-2 text-xs text-slate-600 hover:bg-slate-50 transition font-medium"
                     >
@@ -110,7 +151,7 @@ export default function Header() {
               )}
             </div>
           ) : (
-            /* TRẠNG THÁI 2: CHƯA ĐĂNG NHẬP -> HIỂN THỊ 2 NÚT ĐĂNG KÝ / ĐĂNG NHẬP */
+            /* TRẠNG THÁI 2: CHƯA ĐĂNG NHẬP */
             <>
               <Link to="/register" className="rounded-xl border border-blue-100 bg-blue-50/50 px-4 py-1.5 text-xs font-semibold text-blue-600 hover:bg-blue-50 transition">
                 Đăng ký
