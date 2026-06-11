@@ -28,8 +28,6 @@ import CVTemplateManagement from './views/admin/CVTemplateManagement';
 // employer
 import EmployerPage from './views/employer/EmployerPage';
 
-import ElegantCVTemplate from './components/CV_template/ElegantCVTemplate'
-
 function App() {
   return (
     <>    
@@ -45,9 +43,9 @@ function App() {
             <Route path="/application-history" element={<AppliedJobs />} />
             <Route path="/companies/:id" element={<CompanyDetail />} />
             <Route path="/ai-suggestions" element={<AiJobs />} />
-            <Route path="/create-cv" element={<CreateCV />} />
-            <Route path="/edit-cv/:id" element={<UpdateCV />} />
-            <Route path="/preview-cv/:id" element={<CVPreviewAndTemplate />} />
+            <Route path="/cv-management/create-cv" element={<CreateCV />} />
+            <Route path="/cv-management/edit-cv/:id" element={<UpdateCV />} />
+            <Route path="/cv-management/preview-cv/:id" element={<CVPreviewAndTemplate />} />
           </Route>
           <Route path="/employer" element={<EmployerPage />} />
           <Route path="/admin/login" element={<AdminLoginPage />} />
@@ -57,8 +55,6 @@ function App() {
             <Route path="/admin/users" element={<UserManagement />} />
             <Route path="/admin/cv-templates" element={<CVTemplateManagement />} />
           </Route>
-          <Route path='/cv-template' element={<ElegantCVTemplate/>}/>
-
         </Routes>
       </BrowserRouter>
     </>
