@@ -4,6 +4,7 @@ import { ArrowLeft, FileText, Plus, Upload, AlertCircle, Monitor, HardDrive, Ref
 import axios from 'axios';
 import CVItem from '../../components/CVItem';
 import CVUploadZone from '../../components/CVUploadZone';
+import { handleDownloadAndSaveCV } from '../../utils/cvHandler';
 
 const API_BASE_URL = 'http://localhost:8000/api';
 
@@ -14,6 +15,9 @@ export default function CVManagement() {
   const [uploadedFiles, setUploadedFiles] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showUploadZone, setShowUploadZone] = useState(false);
+  
+  // 🚀 ĐỒNG BỘ THÊM: State quản lý trạng thái tải PDF trực tuyến cho nút bấm của CVItem
+  const [isDownloading, setIsDownloading] = useState(false);
 
   // Đếm số lượng file do người dùng tự tải lên từ máy tính (Giới hạn tối đa 3)
   const countUploadedFiles = uploadedFiles.filter(file => file.type === 'uploaded').length;
@@ -30,13 +34,13 @@ export default function CVManagement() {
         }
       });
 
-      // Khợp cấu trúc dữ liệu mới từ Backend trả về
+      // Khớp cấu trúc dữ liệu mới từ Backend trả về
       setProfile(response.data.cv_online);
       setUploadedFiles(response.data.cv_files || []);
     } catch (error) {
       console.error("Không thể tải dữ liệu hồ sơ từ hệ thống:", error);
     } finally {
-      setLoading(false);
+      loading && setLoading(false);
     }
   };
 
@@ -52,16 +56,20 @@ export default function CVManagement() {
     fetchCVData();
   };
 
+  // 🚀 HÀM KÍCH HOẠT API TẢI CV TRỰC TUYẾN DÙNG CHUNG
+  const handleDownloadOnlineCV = async () => {
+    // Gọi hàm tiện ích xử lý luồng Blob PDF từ Backend, truyền state để điều khiển UI xoay vòng loading
+    await handleDownloadAndSaveCV(null, setIsDownloading);
+  };
+
   // 🚀 HÀM XEM FILE PDF AN TOÀN - ĐỒNG BỘ ĐƯỜNG DẪN TỪ SERVER LARAVEL
-  // 🚀 HÀM XEM FILE PDF - ÉP TRÌNH DUYỆT MỞ XEM TRỰC TIẾP CHUẨN 100%
-  // 🚀 HÀM XEM FILE - HỖ TRỢ CẢ PDF LẪN DOCX XEM TRỰC TUYẾN
   const handleViewFile = (filePath) => {
     const fullUrl = filePath.startsWith('http')
         ? filePath
         : `http://localhost:8000${filePath}`;
 
     window.open(fullUrl, '_blank');
-};
+  };
 
   // Xử lý tải hồ sơ trực tiếp lên máy chủ Laravel
   const handleUploadCV = () => {
@@ -111,8 +119,7 @@ export default function CVManagement() {
       try {
         const token = localStorage.getItem('token');
         
-        // Gọi đến API xóa mềm đã định nghĩa ở Backend Laravel
-        const res = await axios.delete(`${API_BASE_URL}/cv-files/${id}`, {
+        const res = await axios.delete(`${API_BASE_URL}/cv-management/destroy-file/${id}`, {
           headers: {
             'Authorization': token ? `Bearer ${token}` : '',
             'Accept': 'application/json'
@@ -121,7 +128,7 @@ export default function CVManagement() {
 
         if (res.data.success || res.status === 200) {
           alert(res.data.message || 'Xóa mềm tệp tin thành công!');
-          fetchCVData(); // Làm mới lại danh sách ngay lập tức không cần tải lại trang
+          fetchCVData();
         }
       } catch (error) {
         console.error("Lỗi xóa file:", error);
@@ -231,6 +238,7 @@ export default function CVManagement() {
                 </div>
               ) : (
                 <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-5">
+                  {/* 🚀 ĐÃ BỔ SUNG PROPS TRUYỀN XUỐNG CHO CVITEM THỰC THI DOWNLOAD */}
                   <CVItem
                     cv={{
                       id: profile.id,
@@ -241,6 +249,8 @@ export default function CVManagement() {
                     }}
                     onEdit={() => navigate(`/cv-management/edit-cv/${profile.id}`)}
                     changeTemplate={() => navigate(`/cv-management/preview-cv/${profile.id}`)}
+                    onDownload={handleDownloadOnlineCV}
+                    isDownloading={isDownloading}
                   />
                 </div>
               )}
@@ -303,7 +313,6 @@ export default function CVManagement() {
                         </span>
 
                         <div className="flex items-center gap-3">
-                          {/* 🚀 ĐÃ SỬA THÀNH NÚT GỌI HÀM HANDLE VIEW FILE AN TOÀN */}
                           <button
                             type="button"
                             onClick={() => handleViewFile(file.file_path)}
