@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
-// 💡 BƯỚC 1: Thêm useLocation để nhận biết trang nào đang mở nhằm đổi màu Menu động
-import { Link, useLocation } from 'react-router-dom';
+import React, { useState, useEffect, useRef } from 'react';
+// Thêm useNavigate để điều hướng sau khi đăng xuất
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { 
   LayoutDashboard, 
   Settings, 
@@ -9,33 +9,93 @@ import {
   Layers, 
   AlertTriangle, 
   BarChart3,
-  LayoutTemplate 
+  LayoutTemplate,
+  LogOut // Import icon đăng xuất
 } from 'lucide-react'; 
 
 export default function SideBar() {
   const [isSystemMenuOpen, setIsSystemMenuOpen] = useState(true);
-  const location = useLocation(); // Lấy đường dẫn hiện tại của trình duyệt
+  const location = useLocation(); 
+  const navigate = useNavigate(); // Hook dùng để chuyển trang
+  
+  // Dùng useRef để lưu trữ thời gian đếm ngược mà không làm re-render lại giao diện liên tục
+  const timeoutRef = useRef(null);
+  const FIFTEEN_MINUTES = 15 * 60 * 1000; // 15 phút đổi ra mili-giây
 
-  // Hàm tiện ích: Kiểm tra xem menu có đang được kích hoạt hay không để tự động sáng màu
+  // Hàm kiểm tra menu kích hoạt
   const isActive = (path) => location.pathname === path;
 
+  // ================= THAO TÁC 1: HÀM XỬ LÝ ĐĂNG XUẤT THỦ CÔNG =================
+  const handleLogout = () => {
+    // 1. Xóa sạch mọi dấu vết lưu trữ ở Local và Session Storage
+    localStorage.removeItem('token');
+    localStorage.removeItem('user_info');
+    sessionStorage.clear(); // Xóa sạch bộ nhớ phiên làm việc
+
+    // Nếu bạn có API đăng xuất bên Laravel, có thể gọi fetch ở đây trước khi xóa token:
+    /*
+    fetch('http://127.0.0.1:8000/api/admin/logout', {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+    });
+    */
+
+    // 2. Đá Admin bay về trang đăng nhập
+    navigate('/login');
+  };
+
+  // ================= THAO TÁC 2: TỰ ĐỘNG ĐĂNG XUẤT KHI BẤT ĐỘNG (15 PHÚT) =================
+  const resetTimer = () => {
+    // Nếu có bộ đếm cũ đang chạy, xóa nó đi để tính lại từ đầu
+    if (timeoutRef.current) clearTimeout(timeoutRef.current);
+
+    // Thiết lập bộ đếm mới, sau 15 phút bất động sẽ tự gọi hàm handleLogout
+    timeoutRef.current = setTimeout(() => {
+      alert('Phiên làm việc đã hết hạn do bạn không tương tác trong 15 phút. Hệ thống sẽ tự động đăng xuất!');
+      handleLogout();
+    }, FIFTEEN_MINUTES);
+  };
+
+  useEffect(() => {
+    // Các sự kiện để nhận biết người dùng còn đang ngồi trước màn hình và thao tác
+    const events = ['mousedown', 'mousemove', 'keypress', 'scroll', 'touchstart'];
+
+    // Kích hoạt bộ đếm ngay khi Admin vừa tải trang SideBar lần đầu tiên
+    resetTimer();
+
+    // Lắng nghe tất cả hành động của người dùng, hễ cử động là reset lại 15 phút
+    events.forEach(event => {
+      window.addEventListener(event, resetTimer);
+    });
+
+    // Hàm dọn dẹp (Cleanup) khi Component bị hủy, tránh rò rỉ bộ nhớ (Memory Leak)
+    return () => {
+      if (timeoutRef.current) clearTimeout(timeoutRef.current);
+      events.forEach(event => {
+        window.removeEventListener(event, resetTimer);
+      });
+    };
+  }, []);
+
   return (
+    // Thêm h-screen để bám sát chiều cao màn hình và đính kèm flex-col để chia không gian menu
     <aside className="w-64 bg-white border-r border-slate-200 flex flex-col hidden md:flex z-10 shadow-sm h-screen sticky top-0">
-      <div className="h-16 flex items-center justify-center border-b border-slate-100">
+      
+      {/* Brand Logo */}
+      <div className="h-16 flex items-center justify-center border-b border-slate-100 flex-shrink-0">
         <h2 className="font-extrabold text-2xl tracking-wide text-blue-600">
           JobPortal<span className="text-slate-800">Admin</span>
         </h2>
       </div>
 
+      {/* Main Navigation Menu */}
       <nav className="flex-1 px-4 py-6 overflow-y-auto space-y-1.5">
         
-        {/* Dashboard (💡 Đã đổi màu động bằng hàm isActive) */}
+        {/* Dashboard */}
         <Link 
           to="/admin" 
           className={`flex items-center space-x-3 px-3 py-2.5 rounded-lg text-sm font-semibold transition-colors ${
-            isActive('/admin') 
-              ? 'bg-blue-50 text-blue-700' 
-              : 'text-slate-600 hover:bg-slate-50'
+            isActive('/admin') ? 'bg-blue-50 text-blue-700' : 'text-slate-600 hover:bg-slate-50'
           }`}
         >
           <LayoutDashboard className="w-5 h-5" />
@@ -65,7 +125,6 @@ export default function SideBar() {
 
           {isSystemMenuOpen && (
             <div className="pl-11 pr-3 py-2 space-y-1.5 border-l-2 border-slate-100 ml-5 mt-1">
-              {/* 💡 BƯỚC 2: Truyền thêm query ?tab=... để trang nhận biết cần mở tab nào */}
               <Link 
                 to="/admin/moderation?tab=companies" 
                 className={`block py-1.5 text-sm transition-colors ${
@@ -101,7 +160,7 @@ export default function SideBar() {
           <span>Quản lý tài khoản</span>
         </Link>
 
-        {/* Quản lý danh mục (💡 Đã sửa thêm Icon Layers và chỉnh lề chữ đều đặn) */}
+        {/* Quản lý danh mục */}
         <Link 
           to="/admin/categories" 
           className={`flex items-center space-x-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
@@ -149,6 +208,19 @@ export default function SideBar() {
           <span>Báo cáo thống kê</span>
         </Link>
       </nav>
+
+      {/* ================= NÚT ĐĂNG XUẤT CỐ ĐỊNH Ở ĐÁY SIDEBAR ================= */}
+      <div className="p-4 border-t border-slate-100 flex-shrink-0">
+        <button
+          onClick={handleLogout}
+          className="w-full flex items-center space-x-3 px-3 py-2.5 rounded-lg text-sm font-bold text-red-600 hover:bg-red-50 active:bg-red-100 transition-colors duration-200 group"
+        >
+          {/* Thêm hiệu ứng dịch chuyển nhẹ sang phải khi di chuột vào nút logout */}
+          <LogOut className="w-5 h-5 text-red-500 group-hover:translate-x-0.5 transition-transform" />
+          <span>Đăng xuất</span>
+        </button>
+      </div>
+
     </aside>
   );
 }

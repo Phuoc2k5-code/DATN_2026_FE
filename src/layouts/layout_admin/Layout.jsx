@@ -1,8 +1,18 @@
 import React from 'react';
-import { Outlet } from 'react-router-dom';
+import { Outlet, Navigate } from 'react-router-dom';
 import Header from './Header';
 import Sidebar from './Sidebar';
 export default function Layout () {
+  // 1. Lấy thông tin user từ localStorage
+  const user = JSON.parse(localStorage.getItem('user')); 
+
+  // 2. Kiểm tra xem có phải admin không
+  const isAdmin = user && user.role === 'admin';
+
+  // 3. Nếu KHÔNG PHẢI admin -> Đá văng về trang login ngay lập tức, không chạy code bên dưới
+  if (!isAdmin) {
+    return <Navigate to="/admin/login" replace />;
+  }
   return (
     <div className="flex h-screen bg-slate-50 font-sans text-slate-800">
       <Sidebar />

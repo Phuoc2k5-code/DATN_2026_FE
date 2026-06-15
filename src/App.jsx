@@ -56,7 +56,7 @@ function App() {
           <Route path="/employer/profile" element={<EmployerProfile />} />
           <Route path="/admin/login" element={<AdminLoginPage />} />
           <Route element={<LayoutAdmin/>}>
-            <Route path="/admin" element={<AdminDashboard />} />
+            <Route path="/admin/dashboard" element={<AdminDashboard />} />
             <Route path="/admin/reports" element={<ReportManagement />} />
             <Route path="/admin/users" element={<UserManagement />} />
             <Route path="/admin/cv-templates" element={<CVTemplateManagement />} />

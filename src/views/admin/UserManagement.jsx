@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   Search, 
   UserCheck, 
@@ -6,65 +6,107 @@ import {
   ShieldAlert, 
   Filter,
   User,
-  Briefcase
+  Briefcase,
+  Loader2 // Thêm icon loading cho chuyên nghiệp
 } from 'lucide-react';
 
 export default function UserManagement() {
-  // Dữ liệu mẫu người dùng (Giả lập kết nối từ database)
-  const initialUsers = [
-    {
-      id: 'USR001',
-      name: 'Nguyen Van A',
-      email: 'nguyenvana@gmail.com',
-      role: 'Candidate', // Candidate hoặc Employer
-      status: 'active',  // active hoặc banned
-      createdAt: '01/06/2026',
-    },
-    {
-      id: 'USR002',
-      name: 'Công ty Công nghệ TechVibe',
-      email: 'hr@techvibe.vn',
-      role: 'Employer',
-      status: 'active',
-      createdAt: '28/05/2026',
-    },
-    {
-      id: 'USR003',
-      name: 'Tran Thi B',
-      email: 'tranthib@gmail.com',
-      role: 'Candidate',
-      status: 'banned',
-      createdAt: '15/05/2026',
-    },
-    {
-      id: 'USR004',
-      name: 'Tập đoàn Bán lẻ VinMart',
-      email: 'recruitment@vinmart.com',
-      role: 'Employer',
-      status: 'active',
-      createdAt: '10/05/2026',
-    }
-  ];
-
-  const [users, setUsers] = useState(initialUsers);
+  // Thay dữ liệu cứng bằng state rỗng để đợi API đổ vào
+  const [users, setUsers] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  
   const [searchTerm, setSearchTerm] = useState('');
   const [roleFilter, setRoleFilter] = useState('all');
 
-  // Hàm Toggle Khóa / Mở khóa tài khoản
+  // Khai báo cấu hình API (Thay đổi URL cho đúng với dự án của bạn)
+  const API_BASE_URL = 'http://127.0.0.1:8000/api/admin';
+  const token = localStorage.getItem('token');
+
+  // ================= 1. HÀM GỌI API LẤY DANH SÁCH USER =================
+  const fetchUsers = () => {
+    setLoading(true);
+    fetch(`${API_BASE_URL}/users-except-admin`, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}` // Gửi token lên để Laravel xác thực Admin
+      }
+    })
+    .then(response => {
+      if (!response.ok) throw new Error('Không thể lấy dữ liệu từ hệ thống.');
+      return response.json();
+    })
+    .then(res => {
+      if (res.success) {
+        // Map lại trường dữ liệu từ DB (Laravel dùng deleted_at để nhận biết trạng thái khóa)
+        const formatUsers = res.data.map(u => ({
+          id: u.id,
+          name: u.name,
+          email: u.email,
+          role: u.role, // Lúc này role từ API đổ về (Candidate/Employer/...)
+          status: u.deleted_at ? 'banned' : 'active', // Nếu deleted_at có giá trị nghĩa là đang bị khóa
+          createdAt: new Date(u.created_at).toLocaleDateString('vi-VN') // Format ngày cho đẹp
+        }));
+        setUsers(formatUsers);
+      }
+      setLoading(false);
+    })
+    .catch(err => {
+      console.error(err);
+      setError('Có lỗi xảy ra khi tải danh sách người dùng.');
+      setLoading(false);
+    });
+  };
+
+  // Chạy hàm fetch dữ liệu ngay khi component được render lần đầu
+  useEffect(() => {
+    fetchUsers();
+  }, []);
+
+
+  // ================= 2. HÀM THAY ĐỔI TRẠNG THÁI (KHÓA / MỞ KHÓA) QUA API =================
   const handleToggleStatus = (id, currentStatus) => {
-    const actionText = currentStatus === 'active' ? 'KHÓA' : 'MỞ KHÓA';
+    const isLockAction = currentStatus === 'active';
+    const actionText = isLockAction ? 'KHÓA' : 'MỞ KHÓA';
+    
     if (window.confirm(`Bạn có chắc chắn muốn ${actionText} tài khoản này không?`)) {
-      setUsers(users.map(user => 
-        user.id === id ? { ...user, status: currentStatus === 'active' ? 'banned' : 'active' } : user
-      ));
+      
+      // Xác định đúng URL và Phương thức theo API Laravel đã thiết kế
+      const url = isLockAction ? `${API_BASE_URL}/users/${id}/lock` : `${API_BASE_URL}/users/${id}/unlock`;
+      const method = isLockAction ? 'DELETE' : 'PATCH';
+
+      fetch(url, {
+        method: method,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        }
+      })
+      .then(response => response.json())
+      .then(res => {
+        if (res.success) {
+          alert(res.message);
+          // Cập nhật lại state trực tiếp trên giao diện để tránh phải tải lại toàn bộ trang
+          setUsers(users.map(user => 
+            user.id === id ? { ...user, status: isLockAction ? 'banned' : 'active' } : user
+          ));
+        } else {
+          alert(res.message || 'Thao tác thất bại.');
+        }
+      })
+      .catch(err => {
+        console.error(err);
+        alert('Lỗi kết nối mạng, vui lòng thử lại.');
+      });
     }
   };
 
-  // Xử lý tìm kiếm và bộ lọc dữ liệu
+  // Xử lý tìm kiếm và bộ lọc dữ liệu (Giữ nguyên logic của bạn)
   const filteredUsers = users.filter(user => {
-    const matchesSearch = user.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
-                          user.email.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesRole = roleFilter === 'all' ? true : user.role === roleFilter;
+    const matchesSearch = user.name?.toLowerCase().includes(searchTerm.toLowerCase()) || 
+                          user.email?.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesRole = roleFilter === 'all' ? true : user.role.toLowerCase() === roleFilter.toLowerCase();
     return matchesSearch && matchesRole;
   });
 
@@ -79,7 +121,7 @@ export default function UserManagement() {
         </div>
       </div>
 
-      {/* Thanh công cụ: Tìm kiếm & Bộ lọc (Thanh thoát, hiện đại) */}
+      {/* Thanh công cụ: Tìm kiếm & Bộ lọc */}
       <div className="mb-6 flex flex-col sm:flex-row gap-4 items-center justify-between bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
         {/* Ô Tìm kiếm */}
         <div className="relative w-full sm:w-80">
@@ -108,6 +150,9 @@ export default function UserManagement() {
         </div>
       </div>
 
+      {/* Thông báo nếu lỗi hệ thống */}
+      {error && <div className="mb-4 p-4 text-sm text-red-700 bg-red-50 rounded-lg border border-red-200">{error}</div>}
+
       {/* Danh sách người dùng (Data Table) */}
       <div className="bg-white border border-slate-200 shadow-sm rounded-xl overflow-hidden">
         <div className="overflow-x-auto">
@@ -122,75 +167,87 @@ export default function UserManagement() {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 text-sm">
-              {filteredUsers.map((user) => (
-                <tr key={user.id} className="hover:bg-slate-50/60 transition-colors">
-                  
-                  {/* Tên & Email */}
-                  <td className="px-6 py-4">
-                    <div className="font-semibold text-slate-900">{user.name}</div>
-                    <div className="text-xs text-slate-400 mt-0.5">{user.email}</div>
-                  </td>
-
-                  {/* Vai trò (Kèm Icon trực quan) */}
-                  <td className="px-6 py-4">
-                    {user.role === 'Candidate' ? (
-                      <span className="inline-flex items-center space-x-1.5 px-2.5 py-1 rounded-md text-xs font-medium bg-blue-50 text-blue-700 border border-blue-100">
-                        <User className="w-3.5 h-3.5" />
-                        <span>Ứng viên</span>
-                      </span>
-                    ) : (
-                      <span className="inline-flex items-center space-x-1.5 px-2.5 py-1 rounded-md text-xs font-medium bg-purple-50 text-purple-700 border border-purple-100">
-                        <Briefcase className="w-3.5 h-3.5" />
-                        <span>Nhà tuyển dụng</span>
-                      </span>
-                    )}
-                  </td>
-
-                  {/* Ngày tạo */}
-                  <td className="px-6 py-4 text-slate-500">
-                    {user.createdAt}
-                  </td>
-
-                  {/* Trạng thái hoạt động */}
-                  <td className="px-6 py-4 text-center">
-                    {user.status === 'active' ? (
-                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-emerald-50 text-emerald-700 border border-emerald-200">
-                        Đang hoạt động
-                      </span>
-                    ) : (
-                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-50 text-red-700 border border-red-200">
-                        Đang khóa
-                      </span>
-                    )}
-                  </td>
-
-                  {/* Thao tác Khóa / Mở tài khoản nhanh */}
-                  <td className="px-6 py-4 text-right">
-                    {user.status === 'active' ? (
-                      <button
-                        onClick={() => handleToggleStatus(user.id, user.status)}
-                        className="inline-flex items-center space-x-1 text-xs font-semibold text-red-600 bg-red-50 hover:bg-red-600 hover:text-white px-2.5 py-1.5 rounded-lg transition-colors shadow-sm"
-                        title="Khóa tài khoản"
-                      >
-                        <UserX className="w-3.5 h-3.5" />
-                        <span>Khóa</span>
-                      </button>
-                    ) : (
-                      <button
-                        onClick={() => handleToggleStatus(user.id, user.status)}
-                        className="inline-flex items-center space-x-1 text-xs font-semibold text-emerald-600 bg-emerald-50 hover:bg-emerald-600 hover:text-white px-2.5 py-1.5 rounded-lg transition-colors shadow-sm"
-                        title="Mở khóa tài khoản"
-                      >
-                        <UserCheck className="w-3.5 h-3.5" />
-                        <span>Mở khóa</span>
-                      </button>
-                    )}
+              
+              {/* Trạng thái đang tải dữ liệu (Loading) */}
+              {loading ? (
+                <tr>
+                  <td colSpan="5" className="px-6 py-12 text-center text-slate-400">
+                    <Loader2 className="mx-auto h-8 w-8 animate-spin text-blue-500 mb-2" />
+                    Đang tải danh sách thành viên...
                   </td>
                 </tr>
-              ))}
+              ) : (
+                // Render danh sách user sau khi load xong
+                filteredUsers.map((user) => (
+                  <tr key={user.id} className="hover:bg-slate-50/60 transition-colors">
+                    
+                    {/* Tên & Email */}
+                    <td className="px-6 py-4">
+                      <div className="font-semibold text-slate-900">{user.name}</div>
+                      <div className="text-xs text-slate-400 mt-0.5">{user.email}</div>
+                    </td>
+
+                    {/* Vai trò */}
+                    <td className="px-6 py-4">
+                      {user.role.toLowerCase() === 'candidate' ? (
+                        <span className="inline-flex items-center space-x-1.5 px-2.5 py-1 rounded-md text-xs font-medium bg-blue-50 text-blue-700 border border-blue-100">
+                          <User className="w-3.5 h-3.5" />
+                          <span>Ứng viên</span>
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center space-x-1.5 px-2.5 py-1 rounded-md text-xs font-medium bg-purple-50 text-purple-700 border border-purple-100">
+                          <Briefcase className="w-3.5 h-3.5" />
+                          <span>Nhà tuyển dụng</span>
+                        </span>
+                      )}
+                    </td>
+
+                    {/* Ngày tạo */}
+                    <td className="px-6 py-4 text-slate-500">
+                      {user.createdAt}
+                    </td>
+
+                    {/* Trạng thái hoạt động */}
+                    <td className="px-6 py-4 text-center">
+                      {user.status === 'active' ? (
+                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-emerald-50 text-emerald-700 border border-emerald-200">
+                          Đang hoạt động
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-50 text-red-700 border border-red-200">
+                          Đang khóa
+                        </span>
+                      )}
+                    </td>
+
+                    {/* Thao tác Khóa / Mở tài khoản nhanh */}
+                    <td className="px-6 py-4 text-right">
+                      {user.status === 'active' ? (
+                        <button
+                          onClick={() => handleToggleStatus(user.id, user.status)}
+                          className="inline-flex items-center space-x-1 text-xs font-semibold text-red-600 bg-red-50 hover:bg-red-600 hover:text-white px-2.5 py-1.5 rounded-lg transition-colors shadow-sm"
+                          title="Khóa tài khoản"
+                        >
+                          <UserX className="w-3.5 h-3.5" />
+                          <span>Khóa</span>
+                        </button>
+                      ) : (
+                        <button
+                          onClick={() => handleToggleStatus(user.id, user.status)}
+                          className="inline-flex items-center space-x-1 text-xs font-semibold text-emerald-600 bg-emerald-50 hover:bg-emerald-600 hover:text-white px-2.5 py-1.5 rounded-lg transition-colors shadow-sm"
+                          title="Mở khóa tài khoản"
+                        >
+                          <UserCheck className="w-3.5 h-3.5" />
+                          <span>Mở khóa</span>
+                        </button>
+                      )}
+                    </td>
+                  </tr>
+                ))
+              )}
               
               {/* Trường hợp bộ lọc/tìm kiếm không có kết quả */}
-              {filteredUsers.length === 0 && (
+              {!loading && filteredUsers.length === 0 && (
                 <tr>
                   <td colSpan="5" className="px-6 py-12 text-center text-slate-400">
                     <ShieldAlert className="mx-auto h-10 w-10 text-slate-300 mb-3" />
@@ -205,4 +262,4 @@ export default function UserManagement() {
 
     </div>
   );
-};
+}

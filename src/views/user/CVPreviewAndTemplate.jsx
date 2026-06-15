@@ -5,38 +5,56 @@ import axios from 'axios';
 
 const token = localStorage.getItem('token');
 
-// Danh sách mẫu đồng bộ 100% với cơ sở dữ liệu của bạn
-const TEMPLATE_DESIGNS = [
-  { id: 1, name: 'Mẫu CV Hiện đại', desc: 'Thiết kế trẻ trung, năng động, tối ưu không gian hiển thị', tag: 'Hiện đại' },
-  { id: 2, name: 'Mẫu CV Cổ điển', desc: 'Phong cách truyền thống, lịch sự, tập trung vào kinh nghiệm', tag: 'Cổ điển' },
-  { id: 3, name: 'Mẫu CV Thanh lịch', desc: 'Bố cục cân đối, nhẹ nhàng, phù hợp khối văn phòng, nhân sự', tag: 'Thanh lịch' },
-  { id: 4, name: 'Mẫu CV Sáng tạo', desc: 'Đột phá về bố cục, dòng thời gian, hợp ngành Marketing/Design', tag: 'Sáng tạo' },
-  { id: 5, name: 'Mẫu CV Tối giản', desc: 'Phong cách Tech Minimalist, gọn gàng, phù hợp dân Kỹ thuật/IT', tag: 'Tối giản' },
-];
-
 export default function CVPreviewAndTemplate() {
   const navigate = useNavigate();
-  
-  // 1. Lấy id ứng viên từ thanh URL (Định nghĩa dạng :id trong file Route)
   const { id } = useParams();
   
-  // State quản lý ID ứng viên thực tế, Mẫu đang kích hoạt và chuỗi HTML render từ Blade
+  // =================================================================
+  // ⚡ STATE THAY THẾ: Biến danh sách mẫu từ găm cứng thành State động
+  // =================================================================
+  const [templateDesigns, setTemplateDesigns] = useState([]);
+  
   const [candidateId, setCandidateId] = useState(id || null);
-  const [selectedTemplate, setSelectedTemplate] = useState(null); // Ban đầu để null để tránh găm cứng mẫu 1
+  const [selectedTemplate, setSelectedTemplate] = useState(null); 
   const [cvHtml, setCvHtml] = useState(''); 
   const [loading, setLoading] = useState(true);
   const [loadingHtml, setLoadingHtml] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   // =================================================================
-  // 🎯 LUỒNG KHỞI TẠO DUY NHẤT: Lấy cấu hình từ DB và nạp luôn HTML chuẩn mẫu đó
+  // 🎯 LUỒNG KHỞI TẠO: Lấy danh sách mẫu -> Cấu hình ứng viên -> Nạp HTML
   // =================================================================
   useEffect(() => {
     const initCVConfig = async () => {
       try {
         setLoading(true);
         
-        // Bước 1: Gọi API dạng JSON lấy thông tin meta-data của Candidate (Xem họ đang cài mẫu nào trong DB)
+        // -------------------------------------------------------------
+        // BƯỚC 1: Gọi API lấy danh sách mẫu CV động hệ thống (MỚI THAY THẾ)
+        // -------------------------------------------------------------
+        const listRes = await axios.get('http://localhost:8000/api/cv-templates', {
+          headers: {
+            'Authorization': token ? `Bearer ${token}` : '',
+            'Accept': 'application/json'
+          }
+        });
+
+        let currentActiveTemplates = [];
+        if (listRes.data?.success && listRes.data?.data) {
+          currentActiveTemplates = listRes.data.data;
+          setTemplateDesigns(currentActiveTemplates); // Cập nhật danh sách vào State để map giao diện
+        }
+
+        // Bẫy lỗi nếu hệ thống trống trơn không có mẫu nào trong DB
+        if (currentActiveTemplates.length === 0) {
+          alert('Hệ thống chưa cấu hình mẫu CV nào. Vui lòng chạy Seeder hoặc thêm mẫu bên Admin!');
+          setLoading(false);
+          return;
+        }
+
+        // -------------------------------------------------------------
+        // BƯỚC 2: Gọi API lấy thông tin meta-data cấu hình của Candidate
+        // -------------------------------------------------------------
         const configRes = await axios.get('http://localhost:8000/api/cv-management/preview-cv', {
           headers: {
             'Authorization': token ? `Bearer ${token}` : '',
@@ -44,27 +62,30 @@ export default function CVPreviewAndTemplate() {
           }
         });
         
-        let targetTemplateId = 1; // ID mặc định dự phòng nếu ứng viên chưa từng cài mẫu nào
+        // Lấy ID mẫu đầu tiên trong mảng động làm mặc định dự phòng thay vì găm số 1
+        let targetTemplateId = currentActiveTemplates[0].id; 
 
         if (configRes.data?.success && configRes.data?.data) {
           const cvData = configRes.data.data;
           
-          // Bù ID từ API vào nếu trên thanh URL rỗng
           if (cvData.id) {
             setCandidateId(cvData.id);
           }
           
-          // Nếu trong DB đã có lưu trường cv_template_id cụ thể
           if (cvData.cv_template_id) {
             targetTemplateId = Number(cvData.cv_template_id);
           }
         }
         
-        // Bước 2: Tìm object cấu hình tương ứng để sáng đèn menu bên trái
-        const currentTpl = TEMPLATE_DESIGNS.find(t => t.id === targetTemplateId) || TEMPLATE_DESIGNS[0];
+        // -------------------------------------------------------------
+        // BƯỚC 3: Tìm object mẫu khớp với ID để sáng đèn active thanh menu trái
+        // -------------------------------------------------------------
+        const currentTpl = currentActiveTemplates.find(t => t.id === targetTemplateId) || currentActiveTemplates[0];
         setSelectedTemplate(currentTpl);
         
-        // Bước 3: Gọi nạp trực tiếp mã HTML của ĐÚNG mẫu đó từ Blade View về (Nối cứng Query Params vào URL)
+        // -------------------------------------------------------------
+        // BƯỚC 4: Gọi nạp chuỗi HTML render từ mẫu đó về
+        // -------------------------------------------------------------
         setLoadingHtml(true);
         const htmlRes = await axios.get(`http://localhost:8000/api/cv-management/preview-cv?cv_template_id=${targetTemplateId}`, {
           headers: {
@@ -76,8 +97,6 @@ export default function CVPreviewAndTemplate() {
 
       } catch (error) {
         console.error("Lỗi đồng bộ cấu hình CV ban đầu:", error);
-        // Trại ro nếu API sập hoàn toàn thì đưa về mẫu 1 phòng vệ
-        setSelectedTemplate(TEMPLATE_DESIGNS[0]);
       } finally {
         setLoading(false);
         setLoadingHtml(false);
@@ -85,7 +104,6 @@ export default function CVPreviewAndTemplate() {
     };
 
     initCVConfig();
-    // 🚫 TUYỆT ĐỐI KHÔNG VIẾT THÊM BẤT KỲ CÁI useEffect NÀO KHÁC THEO DÕI [selectedTemplate] Ở ĐÂY NỮA NHA!
   }, []); 
 
   // =================================================================
@@ -94,11 +112,10 @@ export default function CVPreviewAndTemplate() {
   const handleTemplateClick = async (tpl) => {
     if (loadingHtml || !tpl?.id) return;
     
-    setSelectedTemplate(tpl); // Đổi trạng thái hiển thị Active ở menu trái
+    setSelectedTemplate(tpl); 
     
     try {
       setLoadingHtml(true);
-      // Ép cứng tham số ID mẫu vừa chọn vào chuỗi URL, triệt tiêu lỗi thất lạc params ở Backend
       const response = await axios.get(`http://localhost:8000/api/cv-management/preview-cv?cv_template_id=${tpl.id}`, {
         headers: {
           'Authorization': token ? `Bearer ${token}` : '',
@@ -136,7 +153,7 @@ export default function CVPreviewAndTemplate() {
 
       if (response.data.success) {
         alert(response.data.message || `Áp dụng thành công Mẫu: ${selectedTemplate?.name}`);
-        navigate('/cv-management'); // Điều hướng về trang quản lý chính
+        navigate('/cv-management'); 
       }
     } catch (error) {
       if (error.response?.status === 405) {
@@ -149,12 +166,11 @@ export default function CVPreviewAndTemplate() {
     }
   };
 
-  // Màn hình loading đồng bộ dữ liệu lúc vừa vào trang
   if (loading || !selectedTemplate) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center bg-[#FFFDF9] gap-3">
         <Loader2 className="animate-spin text-orange-500" size={32} />
-        <p className="text-sm font-medium text-slate-500">Đang đồng bộ luồng cấu trúc dữ liệu...</p>
+        <p className="text-sm font-medium text-slate-500">Đang đồng bộ luồng cấu trúc dữ liệu hệ thống...</p>
       </div>
     );
   }
@@ -162,7 +178,7 @@ export default function CVPreviewAndTemplate() {
   return (
     <div className="min-h-screen bg-[#FFFDF9] font-sans text-slate-800 antialiased w-full flex flex-col">
       
-      {/* 🚀 BAR TIÊU ĐỀ TRÊN CÙNG (TOPBAR) */}
+      {/* BAR TIÊU ĐỀ TRÊN CÙNG */}
       <div className="w-full bg-white border-b border-orange-100/70 px-4 sm:px-6 lg:px-8 py-4 shadow-xs shrink-0">
         <div className="max-w-7xl mx-auto flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div className="flex items-center gap-3">
@@ -196,10 +212,10 @@ export default function CVPreviewAndTemplate() {
         </div>
       </div>
 
-      {/* 📦 BỐ CỤC CHIA ĐÔI GIAO DIỆN */}
+      {/* BỐ CỤC CHIA ĐÔI GIAO DIỆN */}
       <div className="grow w-full max-w-7xl mx-auto flex flex-col lg:flex-row gap-6 p-4 sm:p-6 lg:p-8">
         
-        {/* ======================= KHỐI TRÁI: DANH SÁCH LỰA CHỌN (1/3) ======================= */}
+        {/* KHỐI TRÁI: DANH SÁCH LỰA CHỌN (1/3) */}
         <div className="w-full lg:w-[360px] space-y-5 shrink-0">
           <div className="bg-white rounded-2xl border border-slate-200/60 p-5 shadow-xs">
             <h2 className="text-xs font-black text-slate-400 tracking-wider uppercase mb-3 flex items-center gap-1.5">
@@ -207,13 +223,13 @@ export default function CVPreviewAndTemplate() {
             </h2>
             
             <div className="space-y-3 max-h-[500px] overflow-y-auto pr-1 scrollbar-thin">
-              {TEMPLATE_DESIGNS.map((tpl) => {
-                // Sử dụng toán tử ?. an toàn để không bao giờ bị dính crash màn hình trắng lỗi render thuộc tính id
+              {/* Vòng lặp map mảng mẫu CV động lấy về từ API */}
+              {templateDesigns.map((tpl) => {
                 const isSelected = selectedTemplate?.id === tpl.id;
                 return (
                   <div
                     key={tpl.id}
-                    onClick={() => handleTemplateClick(tpl)} // Đổi sang gọi hàm click chủ động
+                    onClick={() => handleTemplateClick(tpl)}
                     className={`p-3.5 rounded-xl border cursor-pointer transition-all duration-200 relative group ${
                       isSelected 
                         ? 'border-orange-500 bg-orange-50/30 shadow-xs' 
@@ -227,10 +243,11 @@ export default function CVPreviewAndTemplate() {
                       <span className={`text-[9px] px-1.5 py-0.5 font-bold rounded-sm ${
                         isSelected ? 'bg-orange-500 text-white' : 'bg-slate-100 text-slate-500'
                       }`}>
-                        {tpl.tag}
+                        Mẫu #{tpl.id} {/* Hiển thị tag tự động theo ID mẫu */}
                       </span>
                     </div>
-                    <p className="text-[11px] text-slate-400 mt-1 leading-relaxed">{tpl.desc}</p>
+                    {/* Đổi từ tpl.desc thành tpl.description từ DB mới */}
+                    <p className="text-[11px] text-slate-400 mt-1 leading-relaxed">{tpl.description}</p>
                     
                     {isSelected && (
                       <div className="absolute right-3 bottom-3 w-4 h-4 bg-orange-500 rounded-full flex items-center justify-center">
@@ -249,12 +266,12 @@ export default function CVPreviewAndTemplate() {
               <h4 className="text-xs font-bold text-amber-400">Xem trước trực tuyến</h4>
             </div>
             <p className="text-[10px] text-slate-300 leading-normal">
-              Hệ thống đang nạp trực tiếp chuỗi HTML/CSS từ máy chủ Laravel thông qua giao thức Header Bearer bảo mật tuyệt đối.
+              Hệ thống đang nạp trực tiếp danh sách mẫu và chuỗi mã HTML/CSS đồng bộ từ cơ sở dữ liệu Laravel theo thời gian thực.
             </p>
           </div>
         </div>
 
-        {/* ======================= KHỐI PHẢI: KHUNG IFRAME LIVE PREVIEW (2/3) ======================= */}
+        {/* KHỐI PHẢI: KHUNG IFRAME LIVE PREVIEW (2/3) */}
         <div className="grow flex flex-col items-center w-full">
           
           <div className="w-full max-w-[760px] bg-slate-200/80 border border-b-0 border-slate-300/70 rounded-t-xl px-4 py-2 flex items-center justify-between text-xs text-slate-500 font-medium">
@@ -272,7 +289,6 @@ export default function CVPreviewAndTemplate() {
 
           <div className="w-full max-w-[760px] bg-white border border-slate-300/80 rounded-b-xl shadow-lg min-h-[850px] transition-all duration-300 overflow-hidden relative">
             
-            {/* Hiển thị màn quay tròn Loading đè mờ khi đang biên dịch đổi mẫu CV mới */}
             {loadingHtml && (
               <div className="absolute inset-0 bg-white/70 flex flex-col items-center justify-center gap-2 z-10 transition-all">
                 <Loader2 className="animate-spin text-orange-500" size={28} />
@@ -280,7 +296,6 @@ export default function CVPreviewAndTemplate() {
               </div>
             )}
 
-            {/* Khung iframe lấy thẳng biến cục bộ chuỗi HTML thô nhận về từ Axios đổ vào srcDoc */}
             <iframe
               id="cv-live-preview"
               title="CV Live Preview"
