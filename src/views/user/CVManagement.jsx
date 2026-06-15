@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { ArrowLeft, FileText, Plus, Upload, AlertCircle, Monitor, HardDrive, RefreshCw } from 'lucide-react';
+import { ArrowLeft, FileText, Plus, Upload, AlertCircle, Monitor, HardDrive, RefreshCw, LogIn } from 'lucide-react';
 import axios from 'axios';
+import axiosInstance from 'axios'; // Đảm bảo sử dụng đúng thư viện axios gốc
 import CVItem from '../../components/CVItem';
 import CVUploadZone from '../../components/CVUploadZone';
 import { handleDownloadAndSaveCV } from '../../utils/cvHandler';
@@ -15,40 +16,51 @@ export default function CVManagement() {
   const [uploadedFiles, setUploadedFiles] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showUploadZone, setShowUploadZone] = useState(false);
-  
-  // 🚀 ĐỒNG BỘ THÊM: State quản lý trạng thái tải PDF trực tuyến cho nút bấm của CVItem
   const [isDownloading, setIsDownloading] = useState(false);
 
-  // Đếm số lượng file do người dùng tự tải lên từ máy tính (Giới hạn tối đa 3)
+  // 💡 KIỂM TRA TRẠNG THÁI ĐĂNG NHẬP
+  const token = localStorage.getItem('token');
+  const isLoggedIn = !!token;
+
   const countUploadedFiles = uploadedFiles.filter(file => file.type === 'uploaded').length;
 
   const fetchCVData = async () => {
+    // 🚀 Nếu chưa đăng nhập thì không gọi API để tránh lỗi log console
+    if (!isLoggedIn) {
+      setLoading(false);
+      return;
+    }
+
     try {
       setLoading(true);
-      const token = localStorage.getItem('token');
-
-      const response = await axios.get(`${API_BASE_URL}/cv-management`, {
+      const response = await axiosInstance.get(`${API_BASE_URL}/cv-management`, {
         headers: {
-          'Authorization': token ? `Bearer ${token}` : '',
+          'Authorization': `Bearer ${token}`,
           'Accept': 'application/json'
         }
       });
 
-      // Khớp cấu trúc dữ liệu mới từ Backend trả về
       setProfile(response.data.cv_online);
       setUploadedFiles(response.data.cv_files || []);
     } catch (error) {
       console.error("Không thể tải dữ liệu hồ sơ từ hệ thống:", error);
+      if (error.response?.status === 401) {
+        localStorage.removeItem('token');
+      }
     } finally {
-      loading && setLoading(false);
+      setLoading(false);
     }
   };
 
   useEffect(() => {
     fetchCVData();
-  }, []);
+  }, [isLoggedIn]);
 
   const handleCreateCV = () => {
+    if (!isLoggedIn) {
+      navigate('/login');
+      return;
+    }
     navigate('/cv-management/create-cv');
   };
 
@@ -56,72 +68,23 @@ export default function CVManagement() {
     fetchCVData();
   };
 
-  // 🚀 HÀM KÍCH HOẠT API TẢI CV TRỰC TUYẾN DÙNG CHUNG
   const handleDownloadOnlineCV = async () => {
-    // Gọi hàm tiện ích xử lý luồng Blob PDF từ Backend, truyền state để điều khiển UI xoay vòng loading
     await handleDownloadAndSaveCV(null, setIsDownloading);
   };
 
-  // 🚀 HÀM XEM FILE PDF AN TOÀN - ĐỒNG BỘ ĐƯỜNG DẪN TỪ SERVER LARAVEL
   const handleViewFile = (filePath) => {
     const fullUrl = filePath.startsWith('http')
         ? filePath
         : `http://localhost:8000${filePath}`;
-
     window.open(fullUrl, '_blank');
   };
 
-  // Xử lý tải hồ sơ trực tiếp lên máy chủ Laravel
-  const handleUploadCV = () => {
-    if (countUploadedFiles >= 3) {
-      alert('Bạn chỉ được phép lưu trữ tối đa 3 file CV tải lên từ thiết bị. Vui lòng xóa bớt file cũ!');
-      return;
-    }
-
-    const fileInput = document.createElement('input');
-    fileInput.type = 'file';
-    fileInput.accept = '.pdf';
-    fileInput.onchange = async (e) => {
-      const file = e.target.files[0];
-      if (file) {
-        if (file.size > 5 * 1024 * 1024) {
-          alert('Dung lượng file quá lớn! Vui lòng chọn file dưới 5MB để tối ưu dung lượng hệ thống.');
-          return;
-        }
-
-        const formData = new FormData();
-        formData.append('cv_file', file);
-
-        try {
-          alert('Đang tải file lên hệ thống và kích hoạt AI phân tích...');
-          const token = localStorage.getItem('token');
-
-          await axios.post(`${API_BASE_URL}/cv-upload`, formData, {
-            headers: {
-              'Content-Type': 'multipart/form-data',
-              'Authorization': token ? `Bearer ${token}` : ''
-            }
-          });
-
-          fetchCVData(); 
-        } catch (error) {
-          console.error("Lỗi tải tệp tin:", error);
-          alert('Tải hồ sơ lên thất bại, vui lòng thử lại!');
-        }
-      }
-    };
-    fileInput.click();
-  };
-
-  // 🚀 GỌI API XÓA MỀM TỆP TIN CV ĐÍNH KÈM
   const handleDeleteFile = async (id) => {
     if (window.confirm('Hành động này sẽ ẩn file CV khỏi giao diện của bạn nhưng vẫn bảo lưu lịch sử hệ thống. Bạn có chắc chắn muốn xóa mềm tệp này?')) {
       try {
-        const token = localStorage.getItem('token');
-        
-        const res = await axios.delete(`${API_BASE_URL}/cv-management/destroy-file/${id}`, {
+        const res = await axiosInstance.delete(`${API_BASE_URL}/cv-management/destroy-file/${id}`, {
           headers: {
-            'Authorization': token ? `Bearer ${token}` : '',
+            'Authorization': `Bearer ${token}`,
             'Accept': 'application/json'
           }
         });
@@ -168,24 +131,30 @@ export default function CVManagement() {
                   Quản lý hồ sơ & CV
                 </h1>
                 <p className="text-xs font-medium text-slate-500 mt-1">
-                  Hỗ trợ tối đa 3 file tải lên từ thiết bị • CV Trực tuyến tự động đóng băng khi ứng tuyển
+                  {isLoggedIn 
+                    ? `Hỗ trợ tối đa 3 file tải lên từ thiết bị • Kho tệp hiện tại: ${countUploadedFiles}/3`
+                    : "Vui lòng đăng nhập để sử dụng tính năng tải hồ sơ và quét AI đối sánh Job"
+                  }
                 </p>
               </div>
             </div>
 
+            {/* KHU VỰC CÁC NÚT ĐẦU TRANG */}
             <div className="flex items-center gap-3 shrink-0">
               <button
-                onClick={() => setShowUploadZone(!showUploadZone)}
-                disabled={countUploadedFiles >= 3}
-                className={`text-xs font-bold py-2.5 px-4 rounded-xl border shadow-xs transition-all duration-200 flex items-center gap-1.5 transform active:scale-95 ${countUploadedFiles >= 3
+                onClick={() => isLoggedIn ? setShowUploadZone(!showUploadZone) : navigate('/login')}
+                disabled={isLoggedIn && countUploadedFiles >= 3}
+                className={`text-xs font-bold py-2.5 px-4 rounded-xl border shadow-xs transition-all duration-200 flex items-center gap-1.5 transform active:scale-95 ${
+                  isLoggedIn && countUploadedFiles >= 3
                     ? 'bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed'
-                    : 'bg-white/80 hover:bg-orange-50/50 text-slate-700 hover:text-orange-600 border-slate-200 hover:border-orange-200/80 hover:-translate-y-0.5'
-                  }`}
+                    : 'bg-white/80 hover:bg-orange-50/50 text-slate-700 hover:text-orange-600 border-slate-200 hover:border-orange-200/80 hover:-translate-y-0.5 cursor-pointer'
+                }`}
               >
                 <Upload size={13} strokeWidth={2.5} />
-                Tải CV từ máy ({countUploadedFiles}/3)
+                Tải CV từ máy {isLoggedIn && `(${countUploadedFiles}/3)`}
               </button>
-              {showUploadZone && countUploadedFiles < 3 && (
+              
+              {showUploadZone && isLoggedIn && countUploadedFiles < 3 && (
                 <CVUploadZone
                   onUploadSuccess={(data) => {
                     handleUploadSuccess(data);
@@ -197,7 +166,7 @@ export default function CVManagement() {
 
               <button
                 onClick={handleCreateCV}
-                className="bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white text-xs font-bold py-2.5 px-4 rounded-xl shadow-md shadow-orange-100 transition-all duration-200 flex items-center gap-1.5 transform hover:-translate-y-0.5 active:scale-95"
+                className="bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white text-xs font-bold py-2.5 px-4 rounded-xl shadow-md shadow-orange-100 transition-all duration-200 flex items-center gap-1.5 transform hover:-translate-y-0.5 active:scale-95 cursor-pointer"
               >
                 <Plus size={14} strokeWidth={2.5} />
                 Tạo CV trực tuyến
@@ -210,7 +179,25 @@ export default function CVManagement() {
       {/* KHU VỰC HIỂN THỊ DANH SÁCH */}
       <main className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 mt-10 space-y-12">
 
-        {(!profile && uploadedFiles.length === 0) ? (
+        {/* 🚀 CASE 1: CHƯA ĐĂNG NHẬP (Hiện màn hình kích hoạt thay vì thông báo "Danh sách trống") */}
+        {!isLoggedIn ? (
+          <div className="text-center py-16 border border-dashed border-slate-200 rounded-3xl bg-white shadow-xs max-w-xl mx-auto p-6">
+            <div className="w-14 h-14 bg-amber-50 rounded-full flex items-center justify-center mx-auto mb-3.5 border border-amber-100">
+              <AlertCircle size={24} className="text-amber-500" />
+            </div>
+            <h3 className="text-sm font-black text-slate-800 tracking-tight">Yêu cầu đăng nhập</h3>
+            <p className="text-[11px] text-slate-400 mt-1 max-w-xs mx-auto leading-relaxed">
+              Vui lòng kết nối tài khoản ứng viên để bắt đầu khởi tạo hồ sơ trực tuyến, lưu trữ file đính kèm phục vụ việc kết nối ứng tuyển.
+            </p>
+            <button 
+              onClick={() => navigate('/login')}
+              className="mt-5 inline-flex items-center gap-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold px-4 py-2 rounded-xl shadow-md transition-all transform hover:-translate-y-0.5 cursor-pointer"
+            >
+              <LogIn size={13} /> Đăng nhập ngay
+            </button>
+          </div>
+        ) : (!profile && uploadedFiles.length === 0) ? (
+          /* CASE 2: ĐÃ ĐĂNG NHẬP NHƯNG DANH SÁCH TRỐNG THỰC SỰ */
           <div className="text-center py-16 border border-dashed border-slate-200 rounded-3xl bg-white shadow-xs max-w-xl mx-auto mt-8">
             <div className="w-14 h-14 bg-amber-50 rounded-full flex items-center justify-center mx-auto mb-3.5 border border-amber-100">
               <AlertCircle size={24} className="text-amber-400" />
@@ -221,6 +208,7 @@ export default function CVManagement() {
             </p>
           </div>
         ) : (
+          /* CASE 3: ĐÃ ĐĂNG NHẬP VÀ CÓ DỮ LIỆU CHUẨN */
           <>
             {/* SECTION 1: HỒ SƠ TRỰC TUYẾN */}
             <section className="space-y-4">
@@ -234,11 +222,10 @@ export default function CVManagement() {
               {!profile ? (
                 <div className="bg-white p-5 border border-dashed border-slate-200 rounded-2xl flex items-center justify-between">
                   <p className="text-xs text-slate-400 italic">Bạn chưa tạo nội dung cho dữ liệu CV trực tuyến.</p>
-                  <button onClick={handleCreateCV} className="text-xs font-bold text-orange-500 hover:underline">Tạo ngay</button>
+                  <button onClick={handleCreateCV} className="text-xs font-bold text-orange-500 hover:underline cursor-pointer">Tạo ngay</button>
                 </div>
               ) : (
                 <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-5">
-                  {/* 🚀 ĐÃ BỔ SUNG PROPS TRUYỀN XUỐNG CHO CVITEM THỰC THI DOWNLOAD */}
                   <CVItem
                     cv={{
                       id: profile.id,
@@ -274,7 +261,7 @@ export default function CVManagement() {
                 <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-5">
                   {uploadedFiles.map((file, index) => (
                     <div
-                      key={file.id}
+                      key={file.id} 
                       className="relative bg-white p-4 border border-slate-200/60 rounded-2xl shadow-xs hover:shadow-md transition-all duration-200 flex flex-col justify-between min-h-[145px]"
                     >
                       <div>
@@ -282,7 +269,6 @@ export default function CVManagement() {
                           <p className="font-extrabold text-sm text-slate-800 truncate max-w-[160px]" title={file.file_name}>
                             {file.file_name}
                           </p>
-
                           {index === 0 && (
                             <span className="text-[9px] font-bold bg-green-50 text-green-600 px-1.5 py-0.5 rounded border border-green-200 shrink-0 animate-pulse">
                               AI Active
@@ -324,7 +310,7 @@ export default function CVManagement() {
                           {file.type === 'uploaded' ? (
                             <button
                               onClick={() => handleDeleteFile(file.id)}
-                              className="text-[11px] font-bold text-red-400 hover:text-red-600 transition-colors"
+                              className="text-[11px] font-bold text-red-400 hover:text-red-600 transition-colors cursor-pointer"
                             >
                               Xóa
                             </button>

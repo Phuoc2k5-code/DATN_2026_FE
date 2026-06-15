@@ -19,3 +19,4 @@ export const toggleSaveJob = async (jobId) => {
   const response = await api.post(`save-job/${jobId}`); // Chỉnh lại đúng route của bạn
   return response.data;
 };
+

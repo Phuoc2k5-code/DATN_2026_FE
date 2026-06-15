@@ -80,9 +80,9 @@ export default function Header() {
         {/* NAVIGATION MENUS */}
         <nav className="hidden items-center gap-6 md:flex text-sm font-medium text-slate-600">
           <Link to="/" className="text-blue-600 font-semibold border-b-2 border-blue-600 pb-1">Tìm việc</Link>
-          <Link to="/create-cv" className="hover:text-blue-600 transition-colors">Tạo CV</Link>
-          <Link to="/applied-history" className="hover:text-blue-600 transition-colors">Lịch sử ứng tuyển</Link>
-          <Link to="/ai-assistant" className="hover:text-blue-600 transition-colors text-indigo-600 font-semibold">AI gợi ý</Link>
+          <Link to="/cv-management/create-cv" className="hover:text-blue-600 transition-colors">Tạo CV</Link>
+          <Link to="/application-history" className="hover:text-blue-600 transition-colors">Lịch sử ứng tuyển</Link>
+          <Link to="/ai-suggestions" className="hover:text-blue-600 transition-colors text-indigo-600 font-semibold">AI gợi ý</Link>
         </nav>
 
         {/* KHỐI XỬ LÝ ĐĂNG NHẬP / AVATAR */}
@@ -131,7 +131,7 @@ export default function Header() {
                     </Link>
 
                     <Link 
-                      to="/applied-history" 
+                      to="/application-history" 
                       onClick={() => setIsOpenDropdown(false)}
                       className="flex items-center gap-2 px-4 py-2 text-xs text-slate-600 hover:bg-slate-50 transition font-medium"
                     >

@@ -51,6 +51,10 @@ export default function CreateCV() {
   // ================= LUỒNG TỰ ĐỘNG GỌI API KHI VÀO TRANG =================
   useEffect(() => {
     const initPageData = async () => {
+      if (!token) {
+      alert("Chức năng này yêu cầu đăng nhập. Vui lòng đăng nhập tài khoản ứng viên để tiếp tục!");
+      return;
+    }
       try {        
         setLoading(true);
 

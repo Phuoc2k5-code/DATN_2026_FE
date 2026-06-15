@@ -1,27 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useParams } from 'react-router-dom';
 import { ArrowLeft, Check, Sparkles, Layout, ShieldCheck, Download, Eye, Loader2 } from 'lucide-react';
-import axios from 'axios'; // Import axios để gọi API
-
-// =========================================================================
-// 🛑 IMPORT CÁC COMPONENT MẪU CV THẬT
-// =========================================================================
-import ModernCVTemplate from '../../components/CV_template/ModernCVTemplate';
-import ClassicCVTemplate from '../../components/CV_template/ClassicCVTemplate';
-import ElegantCVTemplate from '../../components/CV_template/ElegantCVTemplate';
-import CreativeCVTemplate from '../../components/CV_template/CreativeCVTemplate';
-import TechMinimalistTemplate from '../../components/CV_template/TechMinimalistTemplate';
-
-const TEMPLATE_COMPONENTS = {
-  1: ModernCVTemplate,
-  2: ClassicCVTemplate,
-  3: ElegantCVTemplate,
-  4: CreativeCVTemplate,
-  5: TechMinimalistTemplate,
-};
+import axios from 'axios';
 
 const token = localStorage.getItem('token');
 
+// Danh sách mẫu đồng bộ 100% với cơ sở dữ liệu của bạn
 const TEMPLATE_DESIGNS = [
   { id: 1, name: 'Mẫu CV Hiện đại', desc: 'Thiết kế trẻ trung, năng động, tối ưu không gian hiển thị', tag: 'Hiện đại' },
   { id: 2, name: 'Mẫu CV Cổ điển', desc: 'Phong cách truyền thống, lịch sự, tập trung vào kinh nghiệm', tag: 'Cổ điển' },
@@ -33,89 +17,144 @@ const TEMPLATE_DESIGNS = [
 export default function CVPreviewAndTemplate() {
   const navigate = useNavigate();
   
-  // Các state quản lý dữ liệu ứng viên, trạng thái tải và ID mẫu CV
-  const [candidateData, setCandidateData] = useState(null);
-  const [selectedTemplate, setSelectedTemplate] = useState(TEMPLATE_DESIGNS[0]);
+  // 1. Lấy id ứng viên từ thanh URL (Định nghĩa dạng :id trong file Route)
+  const { id } = useParams();
+  
+  // State quản lý ID ứng viên thực tế, Mẫu đang kích hoạt và chuỗi HTML render từ Blade
+  const [candidateId, setCandidateId] = useState(id || null);
+  const [selectedTemplate, setSelectedTemplate] = useState(null); // Ban đầu để null để tránh găm cứng mẫu 1
+  const [cvHtml, setCvHtml] = useState(''); 
   const [loading, setLoading] = useState(true);
+  const [loadingHtml, setLoadingHtml] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // 1. Dùng useEffect để tự động gọi API lấy dữ liệu thật khi vào trang
+  // =================================================================
+  // 🎯 LUỒNG KHỞI TẠO DUY NHẤT: Lấy cấu hình từ DB và nạp luôn HTML chuẩn mẫu đó
+  // =================================================================
   useEffect(() => {
-    const fetchCVData = async () => {
+    const initCVConfig = async () => {
       try {
         setLoading(true);
-        const response = await axios.get('http://localhost:8000/api/cv-management/getDataCV',{
+        
+        // Bước 1: Gọi API dạng JSON lấy thông tin meta-data của Candidate (Xem họ đang cài mẫu nào trong DB)
+        const configRes = await axios.get('http://localhost:8000/api/cv-management/preview-cv', {
           headers: {
             'Authorization': token ? `Bearer ${token}` : '',
             'Accept': 'application/json'
           }
-        }); // Thay đổi đường dẫn đúng với cấu hình Route của bạn
+        });
         
-        if (response.data.success && response.data.data) {
-          const fetchedData = response.data.data;
-          setCandidateData(fetchedData);
-          console.log(response.data.data)
-          // Nếu ứng viên đã có cv_template_id trong DB, tự động chọn mẫu đó trên UI
-          if (fetchedData.cv_template_id) {
-            const currentTpl = TEMPLATE_DESIGNS.find(t => t.id === fetchedData.cv_template_id);
-            if (currentTpl) setSelectedTemplate(currentTpl);
+        let targetTemplateId = 1; // ID mặc định dự phòng nếu ứng viên chưa từng cài mẫu nào
+
+        if (configRes.data?.success && configRes.data?.data) {
+          const cvData = configRes.data.data;
+          
+          // Bù ID từ API vào nếu trên thanh URL rỗng
+          if (cvData.id) {
+            setCandidateId(cvData.id);
+          }
+          
+          // Nếu trong DB đã có lưu trường cv_template_id cụ thể
+          if (cvData.cv_template_id) {
+            targetTemplateId = Number(cvData.cv_template_id);
           }
         }
+        
+        // Bước 2: Tìm object cấu hình tương ứng để sáng đèn menu bên trái
+        const currentTpl = TEMPLATE_DESIGNS.find(t => t.id === targetTemplateId) || TEMPLATE_DESIGNS[0];
+        setSelectedTemplate(currentTpl);
+        
+        // Bước 3: Gọi nạp trực tiếp mã HTML của ĐÚNG mẫu đó từ Blade View về (Nối cứng Query Params vào URL)
+        setLoadingHtml(true);
+        const htmlRes = await axios.get(`http://localhost:8000/api/cv-management/preview-cv?cv_template_id=${targetTemplateId}`, {
+          headers: {
+            'Authorization': token ? `Bearer ${token}` : '',
+            'Accept': 'text/html'
+          }
+        });
+        setCvHtml(htmlRes.data);
+
       } catch (error) {
-        console.error("Lỗi khi tải dữ liệu ứng viên:", error);
-        alert("Không thể tải thông tin hồ sơ. Vui lòng thử lại sau!");
+        console.error("Lỗi đồng bộ cấu hình CV ban đầu:", error);
+        // Trại ro nếu API sập hoàn toàn thì đưa về mẫu 1 phòng vệ
+        setSelectedTemplate(TEMPLATE_DESIGNS[0]);
       } finally {
         setLoading(false);
+        setLoadingHtml(false);
       }
     };
 
-    fetchCVData();
-  }, []);
+    initCVConfig();
+    // 🚫 TUYỆT ĐỐI KHÔNG VIẾT THÊM BẤT KỲ CÁI useEffect NÀO KHÁC THEO DÕI [selectedTemplate] Ở ĐÂY NỮA NHA!
+  }, []); 
 
-  // 2. Hàm xử lý API cập nhật cv_template_id khi nhấn "Sử dụng mẫu này"
+  // =================================================================
+  // 🎯 LUỒNG ĐỔI MẪU CHỦ ĐỘNG: Kích hoạt khi người dùng CLICK CHUỘT
+  // =================================================================
+  const handleTemplateClick = async (tpl) => {
+    if (loadingHtml || !tpl?.id) return;
+    
+    setSelectedTemplate(tpl); // Đổi trạng thái hiển thị Active ở menu trái
+    
+    try {
+      setLoadingHtml(true);
+      // Ép cứng tham số ID mẫu vừa chọn vào chuỗi URL, triệt tiêu lỗi thất lạc params ở Backend
+      const response = await axios.get(`http://localhost:8000/api/cv-management/preview-cv?cv_template_id=${tpl.id}`, {
+        headers: {
+          'Authorization': token ? `Bearer ${token}` : '',
+          'Accept': 'text/html'
+        }
+      });
+      setCvHtml(response.data);
+    } catch (error) {
+      console.error("Lỗi khi chuyển đổi mẫu thiết kế:", error);
+    } finally {
+      setLoadingHtml(false);
+    }
+  };
+
+  // =================================================================
+  // 🎯 LUỒNG LƯU CHÍNH THỨC: Cập nhật mẫu vào Database khi bấm nút
+  // =================================================================
   const handleApplyTemplate = async () => {
-    if (!candidateData?.id) {
-      alert("Không tìm thấy thông tin hồ sơ để cập nhật.");
+    if (!candidateId) {
+      alert("Không tìm thấy mã số hồ sơ ứng viên hợp lệ để cập nhật.");
       return;
     }
 
     try {
       setIsSubmitting(true);
-      // Gọi API POST truyền kèm ID của Candidate trên url và template_id trong body
-      const response = await axios.post(`http://localhost:8000/api/cv-management/updateCvTemplate/${candidateData.id}`, {
-        cv_template_id: selectedTemplate.id}, {
+      
+      const response = await axios.post(`http://localhost:8000/api/cv-management/updateCvTemplate/${candidateId}`, {
+        cv_template_id: selectedTemplate?.id
+      }, {
         headers: {
-            'Authorization': token ? `Bearer ${token}` : '',
-            'Accept': 'application/json'
+          'Authorization': token ? `Bearer ${token}` : '',
+          'Accept': 'application/json'
         },
       });
 
       if (response.data.success) {
-        alert(response.data.message || `Áp dụng thành công Mẫu: ${selectedTemplate.name}`);
-        navigate('/candidate/cv-management'); // Điều hướng về trang quản lý hồ sơ
+        alert(response.data.message || `Áp dụng thành công Mẫu: ${selectedTemplate?.name}`);
+        navigate('/cv-management'); // Điều hướng về trang quản lý chính
       }
     } catch (error) {
-      // Báo lỗi tường tận để dễ debug
-    if (error.response?.status === 405) {
-      alert("Lỗi 405: Sai phương thức gọi API (Hãy kiểm tra lại trong routes/api.php đang để POST hay PUT)!");
-    } else if (error.response?.status === 401) {
-      alert("Lỗi 401: Phiên đăng nhập hết hạn hoặc Token không hợp lệ!");
-    } else {
-      alert(error.response?.data?.message || "Cập nhật mẫu CV thất bại.");
-    }
+      if (error.response?.status === 405) {
+        alert("Lỗi 405: Sai phương thức gọi API (Hãy kiểm tra routes/api.php đang để POST hay PUT)!");
+      } else {
+        alert(error.response?.data?.message || "Cập nhật mẫu CV thất bại.");
+      }
+    } finally {
       setIsSubmitting(false);
     }
   };
 
-  // Xác định component mẫu sẽ hiển thị trong khung Preview
-  const ActiveTemplateComponent = TEMPLATE_COMPONENTS[selectedTemplate.id];
-
-  // Giao diện chờ trong lúc API đang tải dữ liệu ban đầu
-  if (loading) {
+  // Màn hình loading đồng bộ dữ liệu lúc vừa vào trang
+  if (loading || !selectedTemplate) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center bg-[#FFFDF9] gap-3">
         <Loader2 className="animate-spin text-orange-500" size={32} />
-        <p className="text-sm font-medium text-slate-500">Đang tải cấu trúc dữ liệu hồ sơ...</p>
+        <p className="text-sm font-medium text-slate-500">Đang đồng bộ luồng cấu trúc dữ liệu...</p>
       </div>
     );
   }
@@ -127,7 +166,7 @@ export default function CVPreviewAndTemplate() {
       <div className="w-full bg-white border-b border-orange-100/70 px-4 sm:px-6 lg:px-8 py-4 shadow-xs shrink-0">
         <div className="max-w-7xl mx-auto flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div className="flex items-center gap-3">
-            <Link to="/candidate/cv-management" className="p-2 hover:bg-slate-100 rounded-xl transition-colors group">
+            <Link to="/cv-management" className="p-2 hover:bg-slate-100 rounded-xl transition-colors group">
               <ArrowLeft size={16} className="text-slate-500 group-hover:-translate-x-0.5 transition-transform" />
             </Link>
             <div>
@@ -157,12 +196,11 @@ export default function CVPreviewAndTemplate() {
         </div>
       </div>
 
-      {/* 📦 BỐ CỤC CHIA ĐÔI */}
+      {/* 📦 BỐ CỤC CHIA ĐÔI GIAO DIỆN */}
       <div className="grow w-full max-w-7xl mx-auto flex flex-col lg:flex-row gap-6 p-4 sm:p-6 lg:p-8">
         
-        {/* ======================= KHỐI TRÁI: DANH SÁCH MẪU CV (1/3) ======================= */}
+        {/* ======================= KHỐI TRÁI: DANH SÁCH LỰA CHỌN (1/3) ======================= */}
         <div className="w-full lg:w-[360px] space-y-5 shrink-0">
-          
           <div className="bg-white rounded-2xl border border-slate-200/60 p-5 shadow-xs">
             <h2 className="text-xs font-black text-slate-400 tracking-wider uppercase mb-3 flex items-center gap-1.5">
               <Sparkles size={13} className="text-orange-500" /> Chọn mẫu thiết kế
@@ -170,11 +208,12 @@ export default function CVPreviewAndTemplate() {
             
             <div className="space-y-3 max-h-[500px] overflow-y-auto pr-1 scrollbar-thin">
               {TEMPLATE_DESIGNS.map((tpl) => {
-                const isSelected = selectedTemplate.id === tpl.id;
+                // Sử dụng toán tử ?. an toàn để không bao giờ bị dính crash màn hình trắng lỗi render thuộc tính id
+                const isSelected = selectedTemplate?.id === tpl.id;
                 return (
                   <div
                     key={tpl.id}
-                    onClick={() => setSelectedTemplate(tpl)}
+                    onClick={() => handleTemplateClick(tpl)} // Đổi sang gọi hàm click chủ động
                     className={`p-3.5 rounded-xl border cursor-pointer transition-all duration-200 relative group ${
                       isSelected 
                         ? 'border-orange-500 bg-orange-50/30 shadow-xs' 
@@ -207,16 +246,15 @@ export default function CVPreviewAndTemplate() {
           <div className="bg-slate-900 text-white rounded-2xl p-4 shadow-sm relative overflow-hidden">
             <div className="flex items-center gap-2 mb-1.5">
               <Eye size={14} className="text-amber-400" />
-              <h4 className="text-xs font-bold text-amber-400">Xem trước trực tiếp</h4>
+              <h4 className="text-xs font-bold text-amber-400">Xem trước trực tuyến</h4>
             </div>
             <p className="text-[10px] text-slate-300 leading-normal">
-              Dữ liệu của ứng viên <span className="text-orange-400 font-bold">{candidateData?.user?.name || ''}</span> đang được đồng bộ trực tiếp vào các giao diện mẫu.
+              Hệ thống đang nạp trực tiếp chuỗi HTML/CSS từ máy chủ Laravel thông qua giao thức Header Bearer bảo mật tuyệt đối.
             </p>
           </div>
-
         </div>
 
-        {/* ======================= KHỐI PHẢI: KHUNG XEM TRƯỚC (2/3) ======================= */}
+        {/* ======================= KHỐI PHẢI: KHUNG IFRAME LIVE PREVIEW (2/3) ======================= */}
         <div className="grow flex flex-col items-center w-full">
           
           <div className="w-full max-w-[760px] bg-slate-200/80 border border-b-0 border-slate-300/70 rounded-t-xl px-4 py-2 flex items-center justify-between text-xs text-slate-500 font-medium">
@@ -224,25 +262,32 @@ export default function CVPreviewAndTemplate() {
               <div className="w-2.5 h-2.5 rounded-full bg-red-400"></div>
               <div className="w-2.5 h-2.5 rounded-full bg-yellow-400"></div>
               <div className="w-2.5 h-2.5 rounded-full bg-green-400"></div>
-              <span className="text-[11px] ml-2 text-slate-600 font-semibold">{selectedTemplate.name} - Live_Preview.pdf</span>
+              <span className="text-[11px] ml-2 text-slate-600 font-semibold">{selectedTemplate?.name} - Live_Render.html</span>
             </div>
             <div className="flex items-center gap-3 text-[11px]">
               <span>Tỷ lệ: 100%</span>
-              <Download size={13} className="cursor-not-allowed" />
+              <Download size={13} className="cursor-not-allowed text-slate-400" />
             </div>
           </div>
 
-          <div className="w-full max-w-[760px] bg-white border border-slate-300/80 rounded-b-xl shadow-lg min-h-[900px] p-8 sm:p-12 transition-all duration-300 overflow-hidden text-sm">
+          <div className="w-full max-w-[760px] bg-white border border-slate-300/80 rounded-b-xl shadow-lg min-h-[850px] transition-all duration-300 overflow-hidden relative">
             
-            {ActiveTemplateComponent ? (
-              // Truyền trực tiếp dữ liệu thật 'candidateData' lấy từ API thay vì dùng dữ liệu Mock lúc trước
-              <ActiveTemplateComponent candidateData={candidateData} />
-            ) : (
-              <div className="text-center py-20 text-slate-400">
-                Không tìm thấy file giao diện của mẫu hồ sơ này.
+            {/* Hiển thị màn quay tròn Loading đè mờ khi đang biên dịch đổi mẫu CV mới */}
+            {loadingHtml && (
+              <div className="absolute inset-0 bg-white/70 flex flex-col items-center justify-center gap-2 z-10 transition-all">
+                <Loader2 className="animate-spin text-orange-500" size={28} />
+                <span className="text-xs font-semibold text-slate-500">Đang biên dịch thiết kế...</span>
               </div>
             )}
 
+            {/* Khung iframe lấy thẳng biến cục bộ chuỗi HTML thô nhận về từ Axios đổ vào srcDoc */}
+            <iframe
+              id="cv-live-preview"
+              title="CV Live Preview"
+              srcDoc={cvHtml}
+              className="w-full border-none block bg-white"
+              style={{ minHeight: '850px', height: '100%' }}
+            />
           </div>
 
         </div>

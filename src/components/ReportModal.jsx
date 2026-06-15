@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { AlertCircle, AlertTriangle, X } from 'lucide-react';
+import axios from 'axios'; // 🚀 BỔ SUNG: Import axios để gọi API
 
 export default function ReportModal({
   isOpen,          // Trạng thái đóng/mở (true/false) từ trang cha truyền vào
@@ -10,6 +11,7 @@ export default function ReportModal({
 }) {
   const [reportReason, setReportReason] = useState('');
   const [reportDescription, setReportDescription] = useState('');
+  const [loading, setLoading] = useState(false); // 🚀 BỔ SUNG: Trạng thái chờ khi gửi API
 
   // Nếu trạng thái đóng thì không render gì cả
   if (!isOpen) return null;
@@ -33,28 +35,78 @@ export default function ReportModal({
 
   const activeReasons = type === 'company' ? companyReasons : jobReasons;
 
+  // 🚀 HÀM MỚI: Chuyển đổi chữ Tiếng Việt giao diện sang mã Tiếng Anh mà Backend yêu cầu
+  const getReasonType = (textReason) => {
+    switch (textReason) {
+      case "Thông tin tuyển dụng lừa đảo, giả mạo":
+      case "Yêu cầu đóng phí ứng tuyển, đặt cọc tiền":
+        return 'fraud';
+      case "Địa chỉ hoặc thông tin công ty không có thật":
+        return 'wrong_info';
+      case "Ngôn từ không phù hợp, phân biệt đối xử":
+      case "Đăng tin spam, quấy rối ứng viên":
+        return 'bad_behavior';
+      case "Công ty ma, không có hoạt động trên thực tế":
+      case "Mạo danh thương hiệu doanh nghiệp lớn khác":
+        return 'fake_company';
+      default:
+        return 'other'; // "Lý do khác" hoặc các vi phạm môi trường làm việc
+    }
+  };
+
   // Xử lý gửi dữ liệu lên hệ thống
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
+    const token = localStorage.getItem('token'); 
+    if (!token) {
+      alert("Chức năng này yêu cầu đăng nhập. Vui lòng đăng nhập tài khoản ứng viên để tiếp tục!");
+      setLoading(false);
+      return;
+    }
     if (!reportReason) {
       alert("Vui lòng chọn lý do cụ thể!");
       return;
     }
 
-    // 💡 ĐỒNG BỘ BACKEND: Đây là nơi kết nối API chung cho toàn sàn VieclamPro
-    console.log(`[Hệ thống Báo cáo] Đã gửi đơn tố cáo thành công:`, {
-      type: type, // 'job' hoặc 'company'
-      targetId: targetId,
-      targetName: targetName,
-      reason: reportReason,
-      description: reportDescription,
-      timestamp: new Date().toISOString()
-    });
+    setLoading(true);
 
-    // Reset dữ liệu và đóng bảng
-    setReportReason('');
-    setReportDescription('');
-    onClose(); // Gọi hàm đóng từ trang cha để tắt modal
+    try {     
+      
+      // 2. Gom dữ liệu đúng định dạng gôm chung của Controller
+      const payload = {
+        id: targetId,
+        type: type, // 'job' hoặc 'company'
+        reason_type: getReasonType(reportReason), // Đã dịch sang tiếng Anh mã hóa
+        description: reportDescription || null
+      };
+
+      // 3. Bắn Request lên Backend
+      const response = await axios.post('http://localhost:8000/api/reports', payload, {
+        headers: token ? { 'Authorization': `Bearer ${token}` } : {}
+      });
+
+      if (response.data && response.data.success) {
+        alert(response.data.message || "Gửi báo cáo thành công!");
+        
+        // Reset dữ liệu và đóng bảng
+        setReportReason('');
+        setReportDescription('');
+        onClose(); // Đóng modal
+      }
+    } catch (error) {
+      console.error("Lỗi gửi báo cáo:", error);
+      const errorMsg = error.response?.data?.message || "Đã xảy ra lỗi hệ thống, vui lòng thử lại sau!";
+      
+      // Nếu có lỗi validate chi tiết từ Validator::make trả về
+      if (error.response?.data?.errors) {
+        const firstError = Object.values(error.response.data.errors)[0][0];
+        alert(firstError);
+      } else {
+        alert(errorMsg);
+      }
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -75,8 +127,10 @@ export default function ReportModal({
             </div>
           </div>
           <button
+            type="button"
             onClick={onClose}
             className="p-1 rounded-lg text-slate-400 hover:bg-slate-50 hover:text-slate-600 transition-colors"
+            disabled={loading}
           >
             <X size={16} />
           </button>
@@ -85,7 +139,7 @@ export default function ReportModal({
         {/* FORM NỘI DUNG */}
         <form onSubmit={handleSubmit} className="space-y-4">
 
-          {/* Banner Cảnh báo (Xác nhận chắc chắn muốn báo cáo) */}
+          {/* Banner Cảnh báo */}
           <div className="p-3 bg-amber-50/60 border border-amber-200/60 rounded-xl flex items-start gap-2">
             <AlertTriangle size={15} className="text-amber-600 shrink-0 mt-0.5" />
             <p className="text-[11px] font-semibold text-amber-800 leading-relaxed">
@@ -103,6 +157,7 @@ export default function ReportModal({
                     type="radio"
                     name="reportReason"
                     value={reason}
+                    disabled={loading}
                     checked={reportReason === reason}
                     onChange={(e) => setReportReason(e.target.value)}
                     className="w-3.5 h-3.5 text-blue-600 border-slate-300 focus:ring-blue-500"
@@ -122,6 +177,7 @@ export default function ReportModal({
             <textarea
               rows="3"
               value={reportDescription}
+              disabled={loading}
               onChange={(e) => setReportDescription(e.target.value)}
               placeholder="Cung cấp thêm thông tin hoặc bằng chứng cụ thể để ban quản trị xử lý nhanh hơn..."
               className="w-full text-xs font-medium border border-slate-200 rounded-xl p-3 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/10 placeholder:text-slate-400 leading-relaxed"
@@ -133,15 +189,17 @@ export default function ReportModal({
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2 text-xs font-bold text-slate-500 hover:bg-slate-50 border border-slate-200 rounded-xl transition-colors"
+              disabled={loading}
+              className="px-4 py-2 text-xs font-bold text-slate-500 hover:bg-slate-50 border border-slate-200 rounded-xl transition-colors disabled:opacity-50"
             >
               Hủy bỏ
             </button>
             <button
               type="submit"
-              className="px-4 py-2 text-xs font-bold text-white bg-rose-600 hover:bg-rose-700 rounded-xl transition-colors shadow-sm"
+              disabled={loading}
+              className="px-4 py-2 text-xs font-bold text-white bg-rose-600 hover:bg-rose-700 rounded-xl transition-colors shadow-sm disabled:opacity-50 flex items-center gap-1.5"
             >
-              Xác nhận & Gửi
+              {loading ? 'Đang gửi...' : 'Xác nhận & Gửi'}
             </button>
           </div>
 

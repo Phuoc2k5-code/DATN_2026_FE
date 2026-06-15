@@ -59,7 +59,7 @@ export default function JobCard({ job, onRemoveSuccess }) {
     } catch (error) {
       console.error("Lỗi lưu bài viết:", error);
       // Nếu Backend trả về mã lỗi 401 (Chưa đăng nhập), báo lỗi ngay để ko bị nhảy màu nút bừa bãi
-      alert(error.response?.data?.message || "Vui lòng đăng nhập để thực hiện tính năng lưu tin!");
+      alert("Vui lòng đăng nhập để thực hiện tính năng lưu tin!");
     } finally {
       setShowMenu(false); 
     }
@@ -122,11 +122,7 @@ export default function JobCard({ job, onRemoveSuccess }) {
                   <img 
                     src={job.company.logo_url} 
                     alt={job.company?.company_name} 
-                    className="w-full h-full object-cover"
-                    onError={(e) => {
-                      e.target.onerror = null;
-                      e.target.src = '/images/default-company-logo.png';
-                    }}
+                    className="w-full h-full object-cover"                    
                   />
                 ) : (
                   <div className="w-full h-full bg-blue-600 text-white font-black text-sm flex items-center justify-center uppercase">

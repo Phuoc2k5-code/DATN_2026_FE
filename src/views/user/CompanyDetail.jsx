@@ -305,7 +305,7 @@ export default function CompanyDetails() {
         onClose={() => setIsOpenReport(false)}
         type="company"
         targetId={companyData?.id || id}
-        targetName={companyName}
+        targetName={companyName}        
       />
 
     </div>

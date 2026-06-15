@@ -2,8 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import {
-  User, Lock, LogOut, Camera, ShieldCheck,
-  Mail, Phone, MapPin, Briefcase, Calendar, Save, Edit3, X, ArrowLeft
+  User, Lock, LogOut, Camera, ShieldCheck, LogIn,
+  Mail, Phone, MapPin, Briefcase, Calendar, Save, Edit3, X, ArrowLeft, FilePlus
 } from 'lucide-react';
 
 export default function UserProfile() {
@@ -11,31 +11,31 @@ export default function UserProfile() {
   const [activeTab, setActiveTab] = useState('info');
   const [isEditing, setIsEditing] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [hasProfile, setHasProfile] = useState(true); // 🚀 THÊM: State check xem đã tạo hồ sơ chưa
 
-  // State lưu trữ thông tin hiển thị trên Form
+  // State thông tin người dùng (Mặc định để chế độ Khách nếu chưa đăng nhập)
   const [userInfo, setUserInfo] = useState({
-    fullName: '',
-    email: '',
+    fullName: 'Tài khoản khách',
+    email: 'Chưa đăng nhập',
     phone: '',
     address: '',
-    title: '',
+    title: 'Khách vãng lai',
     dob: '',
     avatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150'
   });
 
-  // 💡 BỔ SUNG: State lưu trữ file ảnh thực tế khi người dùng chọn từ máy tính
   const [avatarFile, setAvatarFile] = useState(null);
-
-  // State dùng để backup dữ liệu cũ (khi người dùng bấm nút "Hủy bỏ")
   const [backupUserInfo, setBackupUserInfo] = useState({});
-
   const [passwordData, setPasswordData] = useState({
     currentPassword: '',
     newPassword: '',
     confirmPassword: ''
   });
 
+  // Kiểm tra sự tồn tại của Token
   const token = localStorage.getItem('token');
+  const isLoggedIn = !!token; 
+
   const apiConfig = {
     headers: { 
       'Authorization': token ? `Bearer ${token}` : '',
@@ -43,14 +43,20 @@ export default function UserProfile() {
     }
   };
 
-  // 1. GỌI API (GET) LẤY THÔNG TIN PROFILE KHI TẢI TRANG
+  // LẤY THÔNG TIN PROFILE
   useEffect(() => {
     const fetchProfile = async () => {
+      if (!isLoggedIn) {
+        setLoading(false);
+        return;
+      }
+
       try {
         setLoading(true);
         const response = await axios.get('http://127.0.0.1:8000/api/user-profile', apiConfig);
         
-        if (response.data.success) {
+        // Trường hợp 1: API thành công và có dữ liệu ứng viên đầy đủ
+        if (response.data.success && response.data.data?.candidate) {
           const uData = response.data.data;
           const profileFetched = {
             fullName: uData.candidate?.full_name || '',
@@ -59,19 +65,31 @@ export default function UserProfile() {
             address: uData.candidate?.address || '',
             title: uData.candidate?.title || '',
             dob: uData.candidate?.birthday || '',
-            // Kiểm tra link ảnh từ DB, bọc lót nếu rỗng
             avatar: uData.candidate?.avatar_url 
               ? `http://127.0.0.1:8000/${uData.candidate.avatar_url}`
               : 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150'
           };
           setUserInfo(profileFetched);
           setBackupUserInfo(profileFetched);
+          setHasProfile(true);
+        } 
+        // Trường hợp 2: Đăng nhập thành công nhưng backend báo chưa có hồ sơ (candidate = null)
+        else if (response.data.has_profile === false || !response.data.data?.candidate) {
+          setHasProfile(false);
+          setUserInfo(prev => ({
+            ...prev,
+            email: response.data.data?.email || 'Đã xác thực tài khoản',
+            fullName: 'Chưa cập nhật họ tên',
+            title: 'Chưa có hồ sơ ứng viên'
+          }));
         }
       } catch (error) {
         console.error("Lỗi lấy thông tin tài khoản:", error);
-        if (error.response?.status === 401) {
-          alert("Phiên đăng nhập đã hết hạn, vui lòng đăng nhập lại.");
-          navigate('/login');
+        // Nếu backend trả về lỗi 404 hoặc lỗi không tìm thấy hồ sơ ứng viên tùy cấu hình API của bạn
+        if (error.response?.status === 404) {
+          setHasProfile(false);
+        } else if (error.response?.status === 401) {
+          localStorage.removeItem('token');
         }
       } finally {
         setLoading(false);
@@ -79,27 +97,24 @@ export default function UserProfile() {
     };
     window.scrollTo(0, 0);
     fetchProfile();
-  }, []);
+  }, [isLoggedIn]);
 
   const handleInfoChange = (e) => {
     const { name, value } = e.target;
     setUserInfo(prev => ({ ...prev, [name]: value }));
   };
 
-  // 💡 BỔ SUNG: Hàm xử lý thay đổi ảnh đại diện (Tạo URL Xem trước cục bộ)
   const handleAvatarChange = (e) => {
     const file = e.target.files[0];
     if (file) {
-      // Kiểm tra dung lượng file (Giới hạn tối đa 5MB theo tài liệu phi chức năng)
       if (file.size > 5 * 1024 * 1024) {
         alert("Dung lượng ảnh đại diện không được vượt quá 5MB!");
         return;
       }
-      
-      setAvatarFile(file); // Lưu file thực tế để gửi lên server sau này
+      setAvatarFile(file);
       setUserInfo(prev => ({
         ...prev,
-        avatar: URL.createObjectURL(file) // Tạo đường dẫn tạm thời hiển thị ngay lập tức lên giao diện
+        avatar: URL.createObjectURL(file)
       }));
     }
   };
@@ -109,11 +124,9 @@ export default function UserProfile() {
     setPasswordData(prev => ({ ...prev, [name]: value }));
   };
 
-  // 2. GỌI API (POST) LƯU THÔNG TIN CÁ NHÂN & CHUYỂN ĐỔI SANG FORMDATA
   const handleSaveInfo = async (e) => {
     e.preventDefault();
     try {
-      // Vì hệ thống cần xử lý tệp tin tải lên, ta bắt buộc sử dụng FormData thay cho đối tượng JSON phẳng
       const formData = new FormData();
       formData.append('full_name', userInfo.fullName);
       formData.append('phone', userInfo.phone);
@@ -122,12 +135,10 @@ export default function UserProfile() {
       formData.append('birthday', userInfo.dob);
       formData.append('gender', 'Khác');
 
-      // Nếu người dùng có chọn ảnh mới, đính kèm tệp file vào request body
       if (avatarFile) {
         formData.append('avatar', avatarFile);
       }
 
-      // Cấu hình Header đặc thù cho việc Upload file
       const uploadConfig = {
         headers: {
           ...apiConfig.headers,
@@ -139,18 +150,16 @@ export default function UserProfile() {
 
       if (response.data.success) {
         alert(response.data.message);
-        
-        // Cập nhật lại đường dẫn ảnh chính thức từ Laravel trả về (nếu có)
         if (response.data.data?.avatar_url) {
           setUserInfo(prev => ({
             ...prev,
             avatar: `http://127.0.0.1:8000/${response.data.data.avatar_url}`
           }));
         }
-        
         setBackupUserInfo(userInfo);
-        setAvatarFile(null); // Reset trạng thái file
+        setAvatarFile(null);
         setIsEditing(false);
+        setHasProfile(true); // Đã lưu thành công đồng nghĩa với việc đã có hồ sơ
       }
     } catch (error) {
       console.error("Lỗi lưu hồ sơ:", error);
@@ -159,8 +168,8 @@ export default function UserProfile() {
   };
 
   const handleCancelEdit = () => {
-    setUserInfo(backupUserInfo); // Khôi phục lại dữ liệu gốc trước khi nhấn sửa
-    setAvatarFile(null); // Hủy tệp tin đang chọn lửng lơ
+    setUserInfo(backupUserInfo);
+    setAvatarFile(null);
     setIsEditing(false);
   };
 
@@ -215,23 +224,21 @@ export default function UserProfile() {
           </Link>
 
           <div className="flex flex-col sm:flex-row items-center gap-5">
-            
-            {/* VÙNG AVATAR ĐÃ ĐƯỢC NÂNG CẤP CHỨC NĂNG SỬA */}
             <div className="relative group shrink-0">
               <img
                 src={userInfo.avatar}
                 alt={userInfo.fullName}
                 className={`w-20 h-20 sm:w-24 sm:h-24 rounded-full object-cover border-4 border-orange-200/60 shadow-md transition-all ${
-                  isEditing ? 'cursor-pointer hover:opacity-80 group-hover:border-blue-300' : 'cursor-default'
+                  isEditing && isLoggedIn && hasProfile ? 'cursor-pointer hover:opacity-80 group-hover:border-blue-300' : 'cursor-default'
                 }`}
                 onError={(e) => {
                   e.target.onerror = null;
                   e.target.src = "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150";
                 }}
-                onClick={() => isEditing && document.getElementById('avatarInput').click()}
+                onClick={() => isEditing && isLoggedIn && hasProfile && document.getElementById('avatarInput').click()}
               />
               
-              {isEditing && (
+              {isEditing && isLoggedIn && hasProfile && (
                 <div 
                   onClick={() => document.getElementById('avatarInput').click()}
                   className="absolute inset-0 bg-black/40 rounded-full flex flex-col items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer text-white text-[10px] font-bold gap-1"
@@ -241,29 +248,34 @@ export default function UserProfile() {
                 </div>
               )}
 
-              {/* Input file ẩn phục vụ việc kích hoạt chọn file */}
               <input 
                 type="file" 
                 id="avatarInput" 
                 accept="image/*" 
                 className="hidden" 
                 onChange={handleAvatarChange}
-                disabled={!isEditing}
+                disabled={!isEditing || !isLoggedIn || !hasProfile}
               />
             </div>
             
             <div className="text-center sm:text-left space-y-1">
               <h1 className="text-xl sm:text-2xl font-extrabold tracking-tight bg-gradient-to-r from-orange-600 to-amber-600 bg-clip-text text-transparent">
-                {userInfo.fullName || "Chưa cập nhật tên"}
+                {userInfo.fullName}
               </h1>
               
               <p className="text-xs sm:text-sm font-medium text-slate-500 flex items-center justify-center sm:justify-start gap-1">
-                <Briefcase size={14} className="text-slate-400" /> {userInfo.title || "Vị trí chưa cập nhật"}
+                <Briefcase size={14} className="text-slate-400" /> {userInfo.title}
               </p>
               
-              <span className="inline-flex items-center gap-1 bg-orange-100/70 text-orange-700 text-[10px] font-bold px-2.5 py-0.5 rounded-xl mt-1.5 border border-orange-200/40 shadow-xs">
-                <ShieldCheck size={11} className="text-emerald-600 fill-emerald-100" /> Tài khoản đã xác thực
-              </span>
+              {isLoggedIn ? (
+                <span className="inline-flex items-center gap-1 bg-orange-100/70 text-orange-700 text-[10px] font-bold px-2.5 py-0.5 rounded-xl mt-1.5 border border-orange-200/40 shadow-xs">
+                  <ShieldCheck size={11} className="text-emerald-600 fill-emerald-100" /> Tài khoản đã xác thực
+                </span>
+              ) : (
+                <span className="inline-flex items-center gap-1 bg-slate-100 text-slate-500 text-[10px] font-bold px-2.5 py-0.5 rounded-xl mt-1.5 border border-slate-200/60 shadow-xs">
+                  Chế độ xem trước
+                </span>
+              )}
             </div>
           </div>
         </div>
@@ -299,220 +311,279 @@ export default function UserProfile() {
 
             <div className="h-px bg-slate-100 my-2"></div>
 
-            <button
-              onClick={handleLogout}
-              className="w-full text-left px-3.5 py-2.5 rounded-xl text-xs font-bold flex items-center gap-2.5 text-rose-600 hover:bg-rose-50 transition-colors"
-            >
-              <LogOut size={15} /> Đăng xuất tài khoản
-            </button>
+            {isLoggedIn ? (
+              <button
+                onClick={handleLogout}
+                className="w-full text-left px-3.5 py-2.5 rounded-xl text-xs font-bold flex items-center gap-2.5 text-rose-600 hover:bg-rose-50 transition-colors"
+              >
+                <LogOut size={15} /> Đăng xuất tài khoản
+              </button>
+            ) : (
+              <button
+                onClick={() => navigate('/login')}
+                className="w-full text-left px-3.5 py-2.5 rounded-xl text-xs font-bold flex items-center gap-2.5 text-blue-600 hover:bg-blue-50 transition-colors"
+              >
+                <LogIn size={15} /> Đăng nhập hệ thống
+              </button>
+            )}
           </div>
 
           {/* KHUNG HIỂN THỊ NỘI DUNG CHÍNH BÊN PHẢI */}
           <div className="md:col-span-3 bg-white border border-slate-200/80 rounded-2xl p-5 sm:p-6 shadow-sm">
 
-            {/* TAB 1: THÔNG TIN NGƯỜI DÙNG */}
-            {activeTab === 'info' && (
-              <form onSubmit={handleSaveInfo} className="space-y-5">
-                <div className="flex items-start justify-between gap-4">
-                  <div>
-                    <h3 className="text-sm font-black text-slate-800 tracking-tight">Thông tin người dùng</h3>
-                    <p className="text-[11px] text-slate-400">Xem hoặc chỉnh sửa thông tin hồ sơ cá nhân và ảnh đại diện.</p>
-                  </div>
-
-                  {!isEditing && (
-                    <button
-                      type="button"
-                      onClick={() => setIsEditing(true)}
-                      className="px-3.5 py-1.5 border border-blue-200 bg-blue-50 hover:bg-blue-100 text-blue-600 text-xs font-bold rounded-xl flex items-center gap-1.5 transition-all transform hover:-translate-y-0.5"
-                    >
-                      <Edit3 size={13} /> Sửa thông tin
-                    </button>
-                  )}
+            {/* TRƯỜNG HỢP 1: Chưa đăng nhập tài khoản */}
+            {!isLoggedIn ? (
+              <div className="py-12 flex flex-col items-center justify-center text-center max-w-sm mx-auto space-y-4">
+                <div className="w-16 h-16 rounded-full bg-amber-50 border border-amber-200 flex items-center justify-center text-amber-500 shadow-inner">
+                  <User size={28} />
                 </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div className="space-y-1.5">
-                    <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wide">
-                      Họ và tên
-                    </label>
-                    <div className="relative">
-                      <input
-                        type="text" name="fullName" value={userInfo.fullName} onChange={handleInfoChange} required
-                        disabled={!isEditing}
-                        className={`w-full text-xs font-semibold px-3 py-2.5 border rounded-xl focus:outline-none transition-all pl-9 ${
-                          isEditing 
-                            ? 'bg-white border-blue-500 shadow-xs focus:ring-1 focus:ring-blue-500/20' 
-                            : 'bg-slate-50/70 border-slate-200 text-slate-600 cursor-default'
-                        }`}
-                      />
-                      <User size={13} className="absolute left-3.5 top-3.5 text-slate-400" />
-                    </div>
-                  </div>
-
-                  <div className="space-y-1.5">
-                    <label className="text-[11px] font-bold text-slate-400 uppercase tracking-wide">
-                      Địa chỉ Email (Không được sửa)
-                    </label>
-                    <div className="relative">
-                      <input
-                        type="email" name="email" value={userInfo.email} disabled
-                        className="w-full text-xs font-semibold px-3 py-2.5 bg-slate-100 border border-slate-200 text-slate-400 rounded-xl cursor-not-allowed pl-9"
-                      />
-                      <Mail size={13} className="absolute left-3.5 top-3.5 text-slate-400" />
-                    </div>
-                  </div>
-
-                  <div className="space-y-1.5">
-                    <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wide">
-                      Số điện thoại
-                    </label>
-                    <div className="relative">
-                      <input
-                        type="text" name="phone" value={userInfo.phone} onChange={handleInfoChange}
-                        disabled={!isEditing}
-                        className={`w-full text-xs font-semibold px-3 py-2.5 border rounded-xl focus:outline-none transition-all pl-9 ${
-                          isEditing 
-                            ? 'bg-white border-blue-500 shadow-xs focus:ring-1 focus:ring-blue-500/20' 
-                            : 'bg-slate-50/70 border-slate-200 text-slate-600 cursor-default'
-                        }`}
-                      />
-                      <Phone size={13} className="absolute left-3.5 top-3.5 text-slate-400" />
-                    </div>
-                  </div>
-
-                  <div className="space-y-1.5">
-                    <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wide">
-                      Ngày sinh
-                    </label>
-                    <div className="relative">
-                      <input
-                        type="date" name="dob" value={userInfo.dob} onChange={handleInfoChange}
-                        disabled={!isEditing}
-                        className={`w-full text-xs font-semibold px-3 py-2.5 border rounded-xl focus:outline-none transition-all pl-9 ${
-                          isEditing 
-                            ? 'bg-white border-blue-500 shadow-xs focus:ring-1 focus:ring-blue-500/20' 
-                            : 'bg-slate-50/70 border-slate-200 text-slate-600 cursor-default'
-                        }`}
-                      />
-                      <Calendar size={13} className="absolute left-3.5 top-3.5 text-slate-400" />
-                    </div>
-                  </div>
-
-                  <div className="sm:col-span-2 space-y-1.5">
-                    <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wide">
-                      Vị trí công việc hiện tại
-                    </label>
-                    <div className="relative">
-                      <input
-                        type="text" name="title" value={userInfo.title} onChange={handleInfoChange}
-                        disabled={!isEditing}
-                        className={`w-full text-xs font-semibold px-3 py-2.5 border rounded-xl focus:outline-none transition-all pl-9 ${
-                          isEditing 
-                            ? 'bg-white border-blue-500 shadow-xs focus:ring-1 focus:ring-blue-500/20' 
-                            : 'bg-slate-50/70 border-slate-200 text-slate-600 cursor-default'
-                        }`}
-                      />
-                      <Briefcase size={13} className="absolute left-3.5 top-3.5 text-slate-400" />
-                    </div>
-                  </div>
-
-                  <div className="sm:col-span-2 space-y-1.5">
-                    <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wide">
-                      Địa chỉ cư trú
-                    </label>
-                    <div className="relative">
-                      <input
-                        type="text" name="address" value={userInfo.address} onChange={handleInfoChange}
-                        disabled={!isEditing}
-                        className={`w-full text-xs font-semibold px-3 py-2.5 border rounded-xl focus:outline-none transition-all pl-9 ${
-                          isEditing 
-                            ? 'bg-white border-blue-500 shadow-xs focus:ring-1 focus:ring-blue-500/20' 
-                            : 'bg-slate-50/70 border-slate-200 text-slate-600 cursor-default'
-                        }`}
-                      />
-                      <MapPin size={13} className="absolute left-3.5 top-3.5 text-slate-400" />
-                    </div>
-                  </div>
+                <div className="space-y-1">
+                  <h3 className="text-sm font-black text-slate-800 tracking-tight">Bạn chưa đăng nhập</h3>
+                  <p className="text-[11px] text-slate-400 leading-relaxed">
+                    Vui lòng đăng nhập hệ thống VieclamPro để quản lý hồ sơ, cập nhật CV, đổi mật khẩu và ứng tuyển các công việc hấp dẫn.
+                  </p>
                 </div>
+                <button
+                  onClick={() => navigate('/login')}
+                  className="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs rounded-xl flex items-center gap-1.5 shadow-md hover:shadow-lg transition-all transform hover:-translate-y-0.5"
+                >
+                  <LogIn size={13} /> Đăng nhập ngay
+                </button>
+              </div>
+            ) : (
+              <>
+                {/* TAB 1: THÔNG TIN NGƯỜI DÙNG */}
+                {activeTab === 'info' && (
+                  <>
+                    {/* 🚀 TRƯỜNG HỢP 2: ĐÃ ĐĂNG NHẬP NHƯNG CHƯA TẠO HỒ SƠ ỨNG VIÊN */}
+                    {!hasProfile ? (
+                      <div className="py-12 flex flex-col items-center justify-center text-center max-w-sm mx-auto space-y-4">
+                        <div className="w-16 h-16 rounded-full bg-rose-50 border border-rose-200 flex items-center justify-center text-rose-500 shadow-inner">
+                          <FilePlus size={26} />
+                        </div>
+                        <div className="space-y-1">
+                          <h3 className="text-sm font-black text-slate-800 tracking-tight">Bạn chưa có hồ sơ ứng viên</h3>
+                          <p className="text-[11px] text-slate-400 leading-relaxed">
+                            Tài khoản của bạn chưa được khởi tạo hồ sơ cá nhân. Vui lòng kích hoạt kích hoạt biểu mẫu bằng cách nhấn nút dưới đây để bắt đầu tìm kiếm việc làm.
+                          </p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            navigate('/cv-management/create-cv') // Bật form lên kích hoạt chế độ điền luôn
+                          }}
+                          className="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl flex items-center gap-1.5 shadow-md hover:shadow-lg transition-all transform hover:-translate-y-0.5"
+                        >
+                          <FilePlus size={13} /> Tạo hồ sơ ngay
+                        </button>
+                      </div>
+                    ) : (
+                      /* TRƯỜNG HỢP THÔNG THƯỜNG: Đã có hồ sơ, hiển thị form như cũ */
+                      <form onSubmit={handleSaveInfo} className="space-y-5">
+                        <div className="flex items-start justify-between gap-4">
+                          <div>
+                            <h3 className="text-sm font-black text-slate-800 tracking-tight">Thông tin người dùng</h3>
+                            <p className="text-[11px] text-slate-400">Xem hoặc chỉnh sửa thông tin hồ sơ cá nhân và ảnh đại diện.</p>
+                          </div>
 
-                {isEditing && (
-                  <div className="pt-2 flex justify-end gap-2">
-                    <button
-                      type="button"
-                      onClick={handleCancelEdit}
-                      className="px-4 py-2.5 border border-slate-200 text-slate-600 hover:bg-slate-50 font-bold text-xs rounded-xl flex items-center gap-1.5 transition-colors"
-                    >
-                      <X size={13} /> Hủy bỏ
-                    </button>
-                    <button
-                      type="submit"
-                      className="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs rounded-xl flex items-center gap-1.5 shadow-md hover:shadow-lg transition-all transform hover:-translate-y-0.5"
-                    >
-                      <Save size={13} /> Lưu thay đổi
-                    </button>
-                  </div>
+                          {!isEditing && (
+                            <button
+                              type="button"
+                              onClick={() => setIsEditing(true)}
+                              className="px-3.5 py-1.5 border border-blue-200 bg-blue-50 hover:bg-blue-100 text-blue-600 text-xs font-bold rounded-xl flex items-center gap-1.5 transition-all transform hover:-translate-y-0.5"
+                            >
+                              <Edit3 size={13} /> Sửa thông tin
+                            </button>
+                          )}
+                        </div>
+
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                          <div className="space-y-1.5">
+                            <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wide">
+                              Họ và tên
+                            </label>
+                            <div className="relative">
+                              <input
+                                type="text" name="fullName" value={userInfo.fullName} onChange={handleInfoChange} required
+                                disabled={!isEditing}
+                                className={`w-full text-xs font-semibold px-3 py-2.5 border rounded-xl focus:outline-none transition-all pl-9 ${
+                                  isEditing 
+                                    ? 'bg-white border-blue-500 shadow-xs focus:ring-1 focus:ring-blue-500/20' 
+                                    : 'bg-slate-50/70 border-slate-200 text-slate-600 cursor-default'
+                                }`}
+                              />
+                              <User size={13} className="absolute left-3.5 top-3.5 text-slate-400" />
+                            </div>
+                          </div>
+
+                          <div className="space-y-1.5">
+                            <label className="text-[11px] font-bold text-slate-400 uppercase tracking-wide">
+                              Địa chỉ Email (Không được sửa)
+                            </label>
+                            <div className="relative">
+                              <input
+                                type="email" name="email" value={userInfo.email} disabled
+                                className="w-full text-xs font-semibold px-3 py-2.5 bg-slate-100 border border-slate-200 text-slate-400 rounded-xl cursor-not-allowed pl-9"
+                              />
+                              <Mail size={13} className="absolute left-3.5 top-3.5 text-slate-400" />
+                            </div>
+                          </div>
+
+                          <div className="space-y-1.5">
+                            <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wide">
+                              Số điện thoại
+                            </label>
+                            <div className="relative">
+                              <input
+                                type="text" name="phone" value={userInfo.phone} onChange={handleInfoChange}
+                                disabled={!isEditing}
+                                className={`w-full text-xs font-semibold px-3 py-2.5 border rounded-xl focus:outline-none transition-all pl-9 ${
+                                  isEditing 
+                                    ? 'bg-white border-blue-500 shadow-xs focus:ring-1 focus:ring-blue-500/20' 
+                                    : 'bg-slate-50/70 border-slate-200 text-slate-600 cursor-default'
+                                }`}
+                              />
+                              <Phone size={13} className="absolute left-3.5 top-3.5 text-slate-400" />
+                            </div>
+                          </div>
+
+                          <div className="space-y-1.5">
+                            <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wide">
+                              Ngày sinh
+                            </label>
+                            <div className="relative">
+                              <input
+                                type="date" name="dob" value={userInfo.dob} onChange={handleInfoChange}
+                                disabled={!isEditing}
+                                className={`w-full text-xs font-semibold px-3 py-2.5 border rounded-xl focus:outline-none transition-all pl-9 ${
+                                  isEditing 
+                                    ? 'bg-white border-blue-500 shadow-xs focus:ring-1 focus:ring-blue-500/20' 
+                                    : 'bg-slate-50/70 border-slate-200 text-slate-600 cursor-default'
+                                }`}
+                              />
+                              <Calendar size={13} className="absolute left-3.5 top-3.5 text-slate-400" />
+                            </div>
+                          </div>
+
+                          <div className="sm:col-span-2 space-y-1.5">
+                            <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wide">
+                              Vị trí công việc hiện tại
+                            </label>
+                            <div className="relative">
+                              <input
+                                type="text" name="title" value={userInfo.title} onChange={handleInfoChange}
+                                disabled={!isEditing}
+                                className={`w-full text-xs font-semibold px-3 py-2.5 border rounded-xl focus:outline-none transition-all pl-9 ${
+                                  isEditing 
+                                    ? 'bg-white border-blue-500 shadow-xs focus:ring-1 focus:ring-blue-500/20' 
+                                    : 'bg-slate-50/70 border-slate-200 text-slate-600 cursor-default'
+                                }`}
+                              />
+                              <Briefcase size={13} className="absolute left-3.5 top-3.5 text-slate-400" />
+                            </div>
+                          </div>
+
+                          <div className="sm:col-span-2 space-y-1.5">
+                            <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wide">
+                              Địa chỉ cư trú
+                            </label>
+                            <div className="relative">
+                              <input
+                                type="text" name="address" value={userInfo.address} onChange={handleInfoChange}
+                                disabled={!isEditing}
+                                className={`w-full text-xs font-semibold px-3 py-2.5 border rounded-xl focus:outline-none transition-all pl-9 ${
+                                  isEditing 
+                                    ? 'bg-white border-blue-500 shadow-xs focus:ring-1 focus:ring-blue-500/20' 
+                                    : 'bg-slate-50/70 border-slate-200 text-slate-600 cursor-default'
+                                }`}
+                              />
+                              <MapPin size={13} className="absolute left-3.5 top-3.5 text-slate-400" />
+                            </div>
+                          </div>
+                        </div>
+
+                        {isEditing && (
+                          <div className="pt-2 flex justify-end gap-2">
+                            <button
+                              type="button"
+                              onClick={handleCancelEdit}
+                              className="px-4 py-2.5 border border-slate-200 text-slate-600 hover:bg-slate-50 font-bold text-xs rounded-xl flex items-center gap-1.5 transition-colors"
+                            >
+                              <X size={13} /> Hủy bỏ
+                            </button>
+                            <button
+                              type="submit"
+                              className="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs rounded-xl flex items-center gap-1.5 shadow-md hover:shadow-lg transition-all transform hover:-translate-y-0.5"
+                            >
+                              <Save size={13} /> Lưu thay đổi
+                            </button>
+                          </div>
+                        )}
+                      </form>
+                    )}
+                  </>
                 )}
-              </form>
-            )}
 
-            {/* TAB 2: ĐỔI MẬT KHẨU */}
-            {activeTab === 'password' && (
-              <form onSubmit={handleSavePassword} className="space-y-5">
-                <div>
-                  <h3 className="text-sm font-black text-slate-800 tracking-tight">Đổi mật khẩu tài khoản</h3>
-                  <p className="text-[11px] text-slate-400">Hãy sử dụng mật khẩu mạnh gồm chữ, số và ký tự để bảo mật tài khoản tốt hơn.</p>
-                </div>
-
-                <div className="space-y-4 max-w-md">
-                  <div className="space-y-1.5">
-                    <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wide">
-                      Mật khẩu hiện tại <span className="text-rose-500">*</span>
-                    </label>
-                    <div className="relative">
-                      <input
-                        type="password" name="currentPassword" value={passwordData.currentPassword} onChange={handlePasswordChange} required placeholder="••••••••"
-                        className="w-full text-xs font-semibold px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500/20 transition-all pl-9"
-                      />
-                      <Lock size={13} className="absolute left-3.5 top-3.5 text-slate-400" />
+                {/* TAB 2: ĐỔI MẬT KHẨU */}
+                {activeTab === 'password' && (
+                  <form onSubmit={handleSavePassword} className="space-y-5">
+                    <div>
+                      <h3 className="text-sm font-black text-slate-800 tracking-tight">Đổi mật khẩu tài khoản</h3>
+                      <p className="text-[11px] text-slate-400">Hãy sử dụng mật khẩu mạnh gồm chữ, số và ký tự để bảo mật tài khoản tốt hơn.</p>
                     </div>
-                  </div>
 
-                  <div className="space-y-1.5">
-                    <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wide">
-                      Mật khẩu mới <span className="text-rose-500">*</span>
-                    </label>
-                    <div className="relative">
-                      <input
-                        type="password" name="newPassword" value={passwordData.newPassword} onChange={handlePasswordChange} required placeholder="••••••••"
-                        className="w-full text-xs font-semibold px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500/20 transition-all pl-9"
-                      />
-                      <Lock size={13} className="absolute left-3.5 top-3.5 text-slate-400" />
+                    <div className="space-y-4 max-w-md">
+                      <div className="space-y-1.5">
+                        <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wide">
+                          Mật khẩu hiện tại <span className="text-rose-500">*</span>
+                        </label>
+                        <div className="relative">
+                          <input
+                            type="password" name="currentPassword" value={passwordData.currentPassword} onChange={handlePasswordChange} required placeholder="••••••••"
+                            className="w-full text-xs font-semibold px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500/20 transition-all pl-9"
+                          />
+                          <Lock size={13} className="absolute left-3.5 top-3.5 text-slate-400" />
+                        </div>
+                      </div>
+
+                      <div className="space-y-1.5">
+                        <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wide">
+                          Mật khẩu mới <span className="text-rose-500">*</span>
+                        </label>
+                        <div className="relative">
+                          <input
+                            type="password" name="newPassword" value={passwordData.newPassword} onChange={handlePasswordChange} required placeholder="••••••••"
+                            className="w-full text-xs font-semibold px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500/20 transition-all pl-9"
+                          />
+                          <Lock size={13} className="absolute left-3.5 top-3.5 text-slate-400" />
+                        </div>
+                      </div>
+
+                      <div className="space-y-1.5">
+                        <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wide">
+                          Xác nhận mật khẩu mới <span className="text-rose-500">*</span>
+                        </label>
+                        <div className="relative">
+                          <input
+                            type="password" name="confirmPassword" value={passwordData.confirmPassword} onChange={handlePasswordChange} required placeholder="••••••••"
+                            className="w-full text-xs font-semibold px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500/20 transition-all pl-9"
+                          />
+                          <Lock size={13} className="absolute left-3.5 top-3.5 text-slate-400" />
+                        </div>
+                      </div>
                     </div>
-                  </div>
 
-                  <div className="space-y-1.5">
-                    <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wide">
-                      Xác nhận mật khẩu mới <span className="text-rose-500">*</span>
-                    </label>
-                    <div className="relative">
-                      <input
-                        type="password" name="confirmPassword" value={passwordData.confirmPassword} onChange={handlePasswordChange} required placeholder="••••••••"
-                        className="w-full text-xs font-semibold px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500/20 transition-all pl-9"
-                      />
-                      <Lock size={13} className="absolute left-3.5 top-3.5 text-slate-400" />
+                    <div className="pt-2 flex justify-end">
+                      <button
+                        type="submit"
+                        className="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs rounded-xl flex items-center gap-1.5 shadow-md hover:shadow-lg transition-all transform hover:-translate-y-0.5"
+                      >
+                        <Save size={13} /> Cập nhật mật khẩu mới
+                      </button>
                     </div>
-                  </div>
-                </div>
-
-                <div className="pt-2 flex justify-end">
-                  <button
-                    type="submit"
-                    className="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs rounded-xl flex items-center gap-1.5 shadow-md hover:shadow-lg transition-all transform hover:-translate-y-0.5"
-                  >
-                    <Save size={13} /> Cập nhật mật khẩu mới
-                  </button>
-                </div>
-              </form>
+                  </form>
+                )}
+              </>
             )}
 
           </div>
