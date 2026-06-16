@@ -93,7 +93,7 @@ export default function SideBar() {
         
         {/* Dashboard */}
         <Link 
-          to="/admin" 
+          to="/admin/dashboard" 
           className={`flex items-center space-x-3 px-3 py-2.5 rounded-lg text-sm font-semibold transition-colors ${
             isActive('/admin') ? 'bg-blue-50 text-blue-700' : 'text-slate-600 hover:bg-slate-50'
           }`}

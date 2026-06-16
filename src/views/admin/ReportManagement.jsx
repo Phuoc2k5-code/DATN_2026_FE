@@ -1,5 +1,18 @@
 import React, { useState, useEffect } from 'react';
-import { Loader2, AlertTriangle, Briefcase, Building2, Layers, X, Calendar, User, FileText, CheckCircle } from 'lucide-react';
+import { 
+  Loader2, 
+  AlertTriangle, 
+  Briefcase, 
+  Building2, 
+  Layers, 
+  X, 
+  Calendar, 
+  User, 
+  FileText, 
+  CheckCircle,
+  ChevronLeft, // Icon cho nút chuyển trang trước
+  ChevronRight // Icon cho nút chuyển trang sau
+} from 'lucide-react';
 
 export default function ReportManagement() {
   const [reports, setReports] = useState([]);
@@ -10,6 +23,10 @@ export default function ReportManagement() {
   const [statusFilter, setStatusFilter] = useState('all');
   const [typeFilter, setTypeFilter] = useState('all');
 
+  // STATE QUẢN LÝ PHÂN TRANG
+  const [currentPage, setCurrentPage] = useState(1);
+  const [lastPage, setLastPage] = useState(1);
+
   // STATE QUẢN LÝ MODAL CHI TIẾT
   const [selectedReport, setSelectedReport] = useState(null);
   const [loadingDetail, setLoadingDetail] = useState(false);
@@ -18,10 +35,11 @@ export default function ReportManagement() {
   const API_BASE_URL = 'http://127.0.0.1:8000/api/admin';
   const token = localStorage.getItem('token');
 
-  // ================= 1. HÀM FETCH DANH SÁCH BÁO CÁO =================
-  const fetchReports = () => {
+  // ================= 1. HÀM FETCH DANH SÁCH BÁO CÁO (ĐÃ THÊM PAGE) =================
+  const fetchReports = (pageNumber = 1) => {
     setLoading(true);
     const queryParams = new URLSearchParams();
+    queryParams.append('page', pageNumber); // Truyền số trang lên Server
     if (statusFilter !== 'all') queryParams.append('status', statusFilter);
     if (typeFilter !== 'all') queryParams.append('type', typeFilter);
 
@@ -39,6 +57,11 @@ export default function ReportManagement() {
     .then(res => {
       if (res.success) {
         setReports(res.data);
+        // Đồng bộ dữ liệu phân trang từ Server Laravel đổ về
+        if (res.pagination) {
+          setCurrentPage(res.pagination.current_page);
+          setLastPage(res.pagination.last_page);
+        }
       }
       setLoading(false);
     })
@@ -49,9 +72,29 @@ export default function ReportManagement() {
     });
   };
 
+  // Tự động kích hoạt gọi API khi người dùng thay đổi bộ lọc hoặc đổi trang
   useEffect(() => {
-    fetchReports();
-  }, [statusFilter, typeFilter]);
+    fetchReports(currentPage);
+  }, [statusFilter, typeFilter, currentPage]);
+
+  // Hàm thay đổi filter loại đối tượng (Auto reset về trang 1 để tránh lỗi lệch trang)
+  const handleTypeFilterChange = (type) => {
+    setTypeFilter(type);
+    setCurrentPage(1);
+  };
+
+  // Hàm thay đổi filter trạng thái xử lý (Auto reset về trang 1)
+  const handleStatusFilterChange = (status) => {
+    setStatusFilter(status);
+    setCurrentPage(1);
+  };
+
+  // Hàm xử lý nhấn nút chuyển trang Prev / Next
+  const handlePageChange = (newPage) => {
+    if (newPage >= 1 && newPage <= lastPage) {
+      setCurrentPage(newPage);
+    }
+  };
 
   // ================= 2. HÀM FETCH CHI TIẾT ĐỂ MỞ MODAL =================
   const handleShowDetail = (id) => {
@@ -151,14 +194,14 @@ export default function ReportManagement() {
         {/* Bộ lọc Pills */}
         <div className="flex flex-wrap items-center gap-4">
           <div className="inline-flex bg-slate-200/60 p-1 rounded-lg">
-            <button onClick={() => setTypeFilter('all')} className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-md transition-all ${typeFilter === 'all' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}><Layers className="h-3.5 w-3.5" /> Tất cả đối tượng</button>
-            <button onClick={() => setTypeFilter('job')} className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-md transition-all ${typeFilter === 'job' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}><Briefcase className="h-3.5 w-3.5" /> Tin tuyển dụng</button>
-            <button onClick={() => setTypeFilter('company')} className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-md transition-all ${typeFilter === 'company' ? 'bg-white text-purple-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}><Building2 className="h-3.5 w-3.5" /> Doanh nghiệp</button>
+            <button onClick={() => handleTypeFilterChange('all')} className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-md transition-all ${typeFilter === 'all' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}><Layers className="h-3.5 w-3.5" /> Tất cả đối tượng</button>
+            <button onClick={() => handleTypeFilterChange('job')} className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-md transition-all ${typeFilter === 'job' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}><Briefcase className="h-3.5 w-3.5" /> Tin tuyển dụng</button>
+            <button onClick={() => handleTypeFilterChange('company')} className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-md transition-all ${typeFilter === 'company' ? 'bg-white text-purple-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}><Building2 className="h-3.5 w-3.5" /> Doanh nghiệp</button>
           </div>
 
           <div className="inline-flex bg-slate-200/60 p-1 rounded-lg">
-            <button onClick={() => setStatusFilter('all')} className={`px-3 py-1.5 text-xs font-bold rounded-md transition-all ${statusFilter === 'all' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>Tất cả trạng thái</button>
-            <button onClick={() => setStatusFilter('pending')} className={`px-3 py-1.5 text-xs font-bold rounded-md transition-all ${statusFilter === 'pending' ? 'bg-white text-amber-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>Cần xử lý</button>
+            <button onClick={() => handleStatusFilterChange('all')} className={`px-3 py-1.5 text-xs font-bold rounded-md transition-all ${statusFilter === 'all' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>Tất cả trạng thái</button>
+            <button onClick={() => handleStatusFilterChange('pending')} className={`px-3 py-1.5 text-xs font-bold rounded-md transition-all ${statusFilter === 'pending' ? 'bg-white text-amber-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>Cần xử lý</button>
           </div>
         </div>
       </div>
@@ -233,7 +276,6 @@ export default function ReportManagement() {
                             <button onClick={() => handleDiscipline(report.id)} className="text-red-600 hover:text-red-800 font-semibold transition-colors">Kỷ luật</button>
                           </div>
                         ) : (
-                          // BẤM VÀO ĐÂY ĐỂ MỞ MODAL XEM CHI TIẾT
                           <button onClick={() => handleShowDetail(report.id)} className="text-blue-600 hover:text-blue-800 font-semibold text-sm">
                             Chi tiết
                           </button>
@@ -243,12 +285,49 @@ export default function ReportManagement() {
                   );
                 })
               )}
+              
+              {!loading && reports.length === 0 && (
+                <tr>
+                  <td colSpan="7" className="px-6 py-12 text-center text-slate-400">
+                    Không tìm thấy báo cáo vi phạm nào phù hợp.
+                  </td>
+                </tr>
+              )}
             </tbody>
           </table>
         </div>
+
+        {/* ================= THANH BẤM PHÂN TRANG (MỚI THÊM) ================= */}
+        {!loading && lastPage > 1 && (
+          <div className="px-6 py-4 bg-slate-50 border-t border-slate-200 flex items-center justify-between">
+            <div className="text-sm text-slate-500">
+              Trang <span className="font-semibold text-slate-700">{currentPage}</span> trên tổng số <span className="font-semibold text-slate-700">{lastPage}</span>
+            </div>
+            
+            <div className="flex items-center space-x-2">
+              <button
+                onClick={() => handlePageChange(currentPage - 1)}
+                disabled={currentPage === 1}
+                className="inline-flex items-center p-2 rounded-lg border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                title="Trang trước"
+              >
+                <ChevronLeft className="h-4 w-4" />
+              </button>
+
+              <button
+                onClick={() => handlePageChange(currentPage + 1)}
+                disabled={currentPage === lastPage}
+                className="inline-flex items-center p-2 rounded-lg border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                title="Trang sau"
+              >
+                <ChevronRight className="h-4 w-4" />
+              </button>
+            </div>
+          </div>
+        )}
       </div>
 
-      {/* ======================= COMPONENT MODAL CHI TIẾT (YÊU CẦU MỚI) ======================= */}
+      {/* ======================= COMPONENT MODAL CHI TIẾT ======================= */}
       {isModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-sm p-4 animate-fade-in">
           <div className="bg-white w-full max-w-xl rounded-2xl shadow-xl border border-slate-100 overflow-hidden flex flex-col max-h-[90vh]">
@@ -276,7 +355,6 @@ export default function ReportManagement() {
                 </div>
               ) : selectedReport && (
                 <>
-                  {/* Thông tin đối tượng bị tố cáo */}
                   <div className="p-4 bg-slate-50 border border-slate-100 rounded-xl">
                     <span className="text-xs text-slate-400 uppercase font-bold tracking-wider block mb-1">Đối tượng bị phản ánh</span>
                     <div className="font-bold text-slate-800 text-base">
@@ -292,7 +370,6 @@ export default function ReportManagement() {
                     </div>
                   </div>
 
-                  {/* Chi tiết người gửi và lý do */}
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
                     <div className="space-y-1">
                       <div className="text-slate-400 flex items-center gap-1"><User className="h-4 w-4" /> Người gửi báo cáo:</div>
@@ -305,7 +382,6 @@ export default function ReportManagement() {
                     </div>
                   </div>
 
-                  {/* Nội dung tố cáo từ Ứng viên */}
                   <div className="space-y-1.5">
                     <div className="text-sm text-slate-400 font-medium">Lý do phân loại: <span className="text-red-600 font-bold">{selectedReport.reason_type}</span></div>
                     <div className="p-3.5 bg-red-50/50 border border-red-100 rounded-xl text-slate-700 text-sm leading-relaxed whitespace-pre-line">
@@ -313,7 +389,6 @@ export default function ReportManagement() {
                     </div>
                   </div>
 
-                  {/* NHẬT KÝ PHÂN XỬ CỦA ADMIN */}
                   <div className="p-4 bg-emerald-50/40 border border-emerald-100 rounded-xl space-y-2">
                     <div className="flex items-center gap-1.5 text-sm text-emerald-800 font-bold">
                       <CheckCircle className="h-4 w-4 text-emerald-600" /> Nhật ký phân xử của Admin

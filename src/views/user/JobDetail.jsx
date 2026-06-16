@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
 import { useParams, Link as RouterLink, useNavigate } from 'react-router-dom';
 import {
@@ -27,6 +27,20 @@ export default function JobDetail() {
   // 🚀 ĐÃ THAY ĐỔI: Chuyển từ boolean sang string để quản lý nhiều trạng thái
   // Giá trị có thể là: null, 'pending', 'viewed', 'interviewing', 'accepted', 'rejected'
   const [applicationStatus, setApplicationStatus] = useState(null);
+  const hasTrackedClick = useRef(false);
+  useEffect(() => {
+    if (hasTrackedClick.current) return;
+  
+    hasTrackedClick.current = true;
+    // Ngay khi ứng viên vào xem tin, tự động gửi API đếm lượt click
+    axios.post(`http://127.0.0.1:8000/api/jobs/${id}/click`)
+      .then(response => {
+        console.log("Hệ thống: " + response.data.message);
+      })
+      .catch(error => {
+        console.error("Không thể ghi nhận lượt tương tác click", error);
+      });
+  }, [id]);
 
   // hàm xem danh sách có cập nhật hay ko
   const handleUploadNewCv = (newCv) => {
