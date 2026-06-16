@@ -2,6 +2,7 @@ import React from 'react';
 import { Outlet, Navigate } from 'react-router-dom';
 import Header from './Header';
 import Sidebar from './Sidebar';
+import Footer from './Footer';
 export default function Layout () {
   // 1. Lấy thông tin user từ localStorage
   const user = JSON.parse(localStorage.getItem('user')); 
@@ -21,6 +22,7 @@ export default function Layout () {
         <main className="flex-1 p-8 overflow-y-auto">
           <Outlet />
         </main>
+        <Footer/>
       </div>
     </div>
   );
