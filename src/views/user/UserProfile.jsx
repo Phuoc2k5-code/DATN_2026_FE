@@ -34,12 +34,12 @@ export default function UserProfile() {
 
   // Kiểm tra sự tồn tại của Token
   const token = localStorage.getItem('token');
-  const isLoggedIn = !!token; 
+  const isLoggedIn = !!token;
 
   const apiConfig = {
-    headers: { 
+    headers: {
       'Authorization': token ? `Bearer ${token}` : '',
-      'Accept': 'application/json' 
+      'Accept': 'application/json'
     }
   };
 
@@ -54,25 +54,35 @@ export default function UserProfile() {
       try {
         setLoading(true);
         const response = await axios.get('http://127.0.0.1:8000/api/user-profile', apiConfig);
-        
+
         // Trường hợp 1: API thành công và có dữ liệu ứng viên đầy đủ
         if (response.data.success && response.data.data?.candidate) {
           const uData = response.data.data;
+
+          // SỬA DÒNG NÀY: Lấy birthday từ trong candidate ra để cắt chuỗi chuẩn ISO
+          const rawBirthday = uData.candidate?.birthday || '';
+          const formattedBirthday = rawBirthday ? rawBirthday.substring(0, 10) : '';
+
           const profileFetched = {
             fullName: uData.candidate?.full_name || '',
             email: uData.email || '',
             phone: uData.candidate?.phone || '',
             address: uData.candidate?.address || '',
             title: uData.candidate?.title || '',
-            dob: uData.candidate?.birthday || '',
-            avatar: uData.candidate?.avatar_url 
+
+            // ĐỒNG BỘ CẢ 2: Gán chuỗi đã cắt đẹp đẽ "2002-11-20" vào cả dob lẫn birthday cho an toàn
+            birthday: formattedBirthday,
+            dob: formattedBirthday,
+
+            avatar: uData.candidate?.avatar_url
               ? `http://127.0.0.1:8000/${uData.candidate.avatar_url}`
               : 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150'
           };
+
           setUserInfo(profileFetched);
           setBackupUserInfo(profileFetched);
           setHasProfile(true);
-        } 
+        }
         // Trường hợp 2: Đăng nhập thành công nhưng backend báo chưa có hồ sơ (candidate = null)
         else if (response.data.has_profile === false || !response.data.data?.candidate) {
           setHasProfile(false);
@@ -179,7 +189,7 @@ export default function UserProfile() {
       alert('Mật khẩu nhập lại không trùng khớp!');
       return;
     }
-    
+
     try {
       const response = await axios.post('http://127.0.0.1:8000/api/user-password/update', {
         current_password: passwordData.currentPassword,
@@ -217,9 +227,9 @@ export default function UserProfile() {
       {/* HEADER TÀI KHOẢN */}
       <div className="w-full bg-gradient-to-br from-orange-100/60 via-amber-100/40 to-white text-slate-800 px-4 sm:px-6 lg:px-8 py-10 border-b border-orange-100/70 shadow-sm">
         <div className="max-w-6xl mx-auto">
-          
+
           <Link to="/" className="flex items-center gap-1.5 text-xs font-semibold text-slate-500 hover:text-orange-500 transition-colors mb-5 group w-fit">
-            <ArrowLeft size={14} className="group-hover:-translate-x-0.5 transition-transform" /> 
+            <ArrowLeft size={14} className="group-hover:-translate-x-0.5 transition-transform" />
             Quay lại trang chủ
           </Link>
 
@@ -228,18 +238,17 @@ export default function UserProfile() {
               <img
                 src={userInfo.avatar}
                 alt={userInfo.fullName}
-                className={`w-20 h-20 sm:w-24 sm:h-24 rounded-full object-cover border-4 border-orange-200/60 shadow-md transition-all ${
-                  isEditing && isLoggedIn && hasProfile ? 'cursor-pointer hover:opacity-80 group-hover:border-blue-300' : 'cursor-default'
-                }`}
+                className={`w-20 h-20 sm:w-24 sm:h-24 rounded-full object-cover border-4 border-orange-200/60 shadow-md transition-all ${isEditing && isLoggedIn && hasProfile ? 'cursor-pointer hover:opacity-80 group-hover:border-blue-300' : 'cursor-default'
+                  }`}
                 onError={(e) => {
                   e.target.onerror = null;
                   e.target.src = "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150";
                 }}
                 onClick={() => isEditing && isLoggedIn && hasProfile && document.getElementById('avatarInput').click()}
               />
-              
+
               {isEditing && isLoggedIn && hasProfile && (
-                <div 
+                <div
                   onClick={() => document.getElementById('avatarInput').click()}
                   className="absolute inset-0 bg-black/40 rounded-full flex flex-col items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer text-white text-[10px] font-bold gap-1"
                 >
@@ -248,25 +257,25 @@ export default function UserProfile() {
                 </div>
               )}
 
-              <input 
-                type="file" 
-                id="avatarInput" 
-                accept="image/*" 
-                className="hidden" 
+              <input
+                type="file"
+                id="avatarInput"
+                accept="image/*"
+                className="hidden"
                 onChange={handleAvatarChange}
                 disabled={!isEditing || !isLoggedIn || !hasProfile}
               />
             </div>
-            
+
             <div className="text-center sm:text-left space-y-1">
               <h1 className="text-xl sm:text-2xl font-extrabold tracking-tight bg-gradient-to-r from-orange-600 to-amber-600 bg-clip-text text-transparent">
                 {userInfo.fullName}
               </h1>
-              
+
               <p className="text-xs sm:text-sm font-medium text-slate-500 flex items-center justify-center sm:justify-start gap-1">
                 <Briefcase size={14} className="text-slate-400" /> {userInfo.title}
               </p>
-              
+
               {isLoggedIn ? (
                 <span className="inline-flex items-center gap-1 bg-orange-100/70 text-orange-700 text-[10px] font-bold px-2.5 py-0.5 rounded-xl mt-1.5 border border-orange-200/40 shadow-xs">
                   <ShieldCheck size={11} className="text-emerald-600 fill-emerald-100" /> Tài khoản đã xác thực
@@ -289,22 +298,20 @@ export default function UserProfile() {
           <div className="md:col-span-1 bg-white border border-slate-200/80 rounded-2xl p-3 shadow-sm space-y-1 shrink-0">
             <button
               onClick={() => setActiveTab('info')}
-              className={`w-full text-left px-3.5 py-2.5 rounded-xl text-xs font-bold flex items-center gap-2.5 transition-all ${
-                activeTab === 'info'
+              className={`w-full text-left px-3.5 py-2.5 rounded-xl text-xs font-bold flex items-center gap-2.5 transition-all ${activeTab === 'info'
                   ? 'bg-blue-50 text-blue-600 border border-blue-100'
                   : 'text-slate-600 hover:bg-slate-50 border border-transparent'
-              }`}
+                }`}
             >
               <User size={15} /> Thông tin cá nhân
             </button>
-            
+
             <button
               onClick={() => { setActiveTab('password'); setIsEditing(false); }}
-              className={`w-full text-left px-3.5 py-2.5 rounded-xl text-xs font-bold flex items-center gap-2.5 transition-all ${
-                activeTab === 'password'
+              className={`w-full text-left px-3.5 py-2.5 rounded-xl text-xs font-bold flex items-center gap-2.5 transition-all ${activeTab === 'password'
                   ? 'bg-blue-50 text-blue-600 border border-blue-100'
                   : 'text-slate-600 hover:bg-slate-50 border border-transparent'
-              }`}
+                }`}
             >
               <Lock size={15} /> Đổi mật khẩu
             </button>
@@ -406,11 +413,10 @@ export default function UserProfile() {
                               <input
                                 type="text" name="fullName" value={userInfo.fullName} onChange={handleInfoChange} required
                                 disabled={!isEditing}
-                                className={`w-full text-xs font-semibold px-3 py-2.5 border rounded-xl focus:outline-none transition-all pl-9 ${
-                                  isEditing 
-                                    ? 'bg-white border-blue-500 shadow-xs focus:ring-1 focus:ring-blue-500/20' 
+                                className={`w-full text-xs font-semibold px-3 py-2.5 border rounded-xl focus:outline-none transition-all pl-9 ${isEditing
+                                    ? 'bg-white border-blue-500 shadow-xs focus:ring-1 focus:ring-blue-500/20'
                                     : 'bg-slate-50/70 border-slate-200 text-slate-600 cursor-default'
-                                }`}
+                                  }`}
                               />
                               <User size={13} className="absolute left-3.5 top-3.5 text-slate-400" />
                             </div>
@@ -437,11 +443,10 @@ export default function UserProfile() {
                               <input
                                 type="text" name="phone" value={userInfo.phone} onChange={handleInfoChange}
                                 disabled={!isEditing}
-                                className={`w-full text-xs font-semibold px-3 py-2.5 border rounded-xl focus:outline-none transition-all pl-9 ${
-                                  isEditing 
-                                    ? 'bg-white border-blue-500 shadow-xs focus:ring-1 focus:ring-blue-500/20' 
+                                className={`w-full text-xs font-semibold px-3 py-2.5 border rounded-xl focus:outline-none transition-all pl-9 ${isEditing
+                                    ? 'bg-white border-blue-500 shadow-xs focus:ring-1 focus:ring-blue-500/20'
                                     : 'bg-slate-50/70 border-slate-200 text-slate-600 cursor-default'
-                                }`}
+                                  }`}
                               />
                               <Phone size={13} className="absolute left-3.5 top-3.5 text-slate-400" />
                             </div>
@@ -455,11 +460,10 @@ export default function UserProfile() {
                               <input
                                 type="date" name="dob" value={userInfo.dob} onChange={handleInfoChange}
                                 disabled={!isEditing}
-                                className={`w-full text-xs font-semibold px-3 py-2.5 border rounded-xl focus:outline-none transition-all pl-9 ${
-                                  isEditing 
-                                    ? 'bg-white border-blue-500 shadow-xs focus:ring-1 focus:ring-blue-500/20' 
+                                className={`w-full text-xs font-semibold px-3 py-2.5 border rounded-xl focus:outline-none transition-all pl-9 ${isEditing
+                                    ? 'bg-white border-blue-500 shadow-xs focus:ring-1 focus:ring-blue-500/20'
                                     : 'bg-slate-50/70 border-slate-200 text-slate-600 cursor-default'
-                                }`}
+                                  }`}
                               />
                               <Calendar size={13} className="absolute left-3.5 top-3.5 text-slate-400" />
                             </div>
@@ -473,11 +477,10 @@ export default function UserProfile() {
                               <input
                                 type="text" name="title" value={userInfo.title} onChange={handleInfoChange}
                                 disabled={!isEditing}
-                                className={`w-full text-xs font-semibold px-3 py-2.5 border rounded-xl focus:outline-none transition-all pl-9 ${
-                                  isEditing 
-                                    ? 'bg-white border-blue-500 shadow-xs focus:ring-1 focus:ring-blue-500/20' 
+                                className={`w-full text-xs font-semibold px-3 py-2.5 border rounded-xl focus:outline-none transition-all pl-9 ${isEditing
+                                    ? 'bg-white border-blue-500 shadow-xs focus:ring-1 focus:ring-blue-500/20'
                                     : 'bg-slate-50/70 border-slate-200 text-slate-600 cursor-default'
-                                }`}
+                                  }`}
                               />
                               <Briefcase size={13} className="absolute left-3.5 top-3.5 text-slate-400" />
                             </div>
@@ -491,11 +494,10 @@ export default function UserProfile() {
                               <input
                                 type="text" name="address" value={userInfo.address} onChange={handleInfoChange}
                                 disabled={!isEditing}
-                                className={`w-full text-xs font-semibold px-3 py-2.5 border rounded-xl focus:outline-none transition-all pl-9 ${
-                                  isEditing 
-                                    ? 'bg-white border-blue-500 shadow-xs focus:ring-1 focus:ring-blue-500/20' 
+                                className={`w-full text-xs font-semibold px-3 py-2.5 border rounded-xl focus:outline-none transition-all pl-9 ${isEditing
+                                    ? 'bg-white border-blue-500 shadow-xs focus:ring-1 focus:ring-blue-500/20'
                                     : 'bg-slate-50/70 border-slate-200 text-slate-600 cursor-default'
-                                }`}
+                                  }`}
                               />
                               <MapPin size={13} className="absolute left-3.5 top-3.5 text-slate-400" />
                             </div>

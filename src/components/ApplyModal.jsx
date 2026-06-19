@@ -292,7 +292,7 @@ export default function ApplyModal({
             <div className="w-11 h-11 rounded-full bg-emerald-50 flex items-center justify-center text-emerald-500 mb-3.5 shadow-sm">
               <CheckCircle2 size={24} className="animate-bounce" />
             </div>
-            <h3 className="text-base font-black text-slate-900">{availableCVs.length > 0 && selectedCv ? "Cập nhật thành công!" : "Ứng tuyển thành công!"}</h3>
+            <h3 className="text-base font-black text-slate-900">Ứng tuyển thành công!</h3>
             <p className="text-xs font-medium text-slate-500 max-w-xs mt-1.5 leading-relaxed">
               Hồ sơ của bạn đã được chuyển tới nhà tuyển dụng <span className="font-bold text-slate-800">{companyName}</span> thành công!
             </p>

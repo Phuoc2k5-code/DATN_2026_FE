@@ -184,12 +184,10 @@ export default function JobDetail() {
       case 'pending':
         return (
           <div className="space-y-2 w-full">
-            <button
-              type="button"
-              onClick={handleOpenApplyModal}
+            <button              
               className="w-full py-3 bg-amber-500 hover:bg-amber-600 text-white rounded-xl font-black text-xs uppercase tracking-wider flex items-center justify-center gap-2 transition-all shadow-md hover:shadow-lg hover:-translate-y-0.5 active:translate-y-0"
             >
-              <RefreshCw size={13} /> Cập nhật hồ sơ ứng tuyển
+              <RefreshCw size={14} /> Hồ sơ đang chờ duyệt
             </button>
             <p className="text-[11px] text-amber-600 text-center font-medium">Hồ sơ đang chờ duyệt. Bạn vẫn có thể sửa!</p>
           </div>
@@ -229,11 +227,9 @@ export default function JobDetail() {
         return (
           <div className="space-y-2 w-full">
             <button
-              type="button"
-              onClick={handleOpenApplyModal}
               className="w-full py-3 bg-rose-600 hover:bg-rose-700 text-white rounded-xl font-black text-xs uppercase tracking-wider flex items-center justify-center gap-2 transition-all shadow-md hover:shadow-lg hover:-translate-y-0.5 active:translate-y-0"
             >
-              <Send size={13} /> Nộp lại hồ sơ ứng tuyển
+              <Send size={14} /> Hồ sơ chưa phù hợp
             </button>
             <div className="flex items-center gap-1 justify-center text-[11px] text-rose-600 font-medium">
               <XCircle size={12} /> <span>Hồ sơ trước chưa phù hợp. Bạn có thể nộp lại bản mới!</span>

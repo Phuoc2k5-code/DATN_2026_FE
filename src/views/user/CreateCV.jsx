@@ -101,6 +101,7 @@ export default function CreateCV() {
                 setCvData({
                   ...INITIAL_EMPTY_FORM,
                   ...backendData,
+                  birthday: backendData.birthday ? backendData.birthday.substring(0, 10) : '',
                   category_id: backendData.category_id ? String(backendData.category_id) : '',
                   links: { ...INITIAL_EMPTY_FORM.links, ...parsedLinks },
                   contact_reference: { ...INITIAL_EMPTY_FORM.contact_reference, ...parsedReference },
@@ -110,6 +111,7 @@ export default function CreateCV() {
                     name: s.name,
                     level: s.pivot?.level || 'Cơ bản'
                   })) : []
+                  
                 });
 
                 if (backendData.avatar_url) {
@@ -267,7 +269,7 @@ if (deleteRes.data.success) {
           // GIỮ NGUYÊN các trường thông tin cơ bản
           full_name: prev.full_name,
           gender: prev.gender,
-          birthday: prev.birthday,
+          birthday: prev.birthday ? prev.birthday.substring(0, 10) : '',
           email: prev.email,
           phone: prev.phone,
           address: prev.address,
