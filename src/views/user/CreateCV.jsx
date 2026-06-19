@@ -9,6 +9,7 @@ const token = localStorage.getItem('token');
 
 const INITIAL_EMPTY_FORM = {
   category_id: '',
+  category_name_input: '', // Lưu tên tạm thời khi user tự gõ danh mục mới
   cv_template_id: 1,
   title: '',
   full_name: '',
@@ -39,7 +40,9 @@ export default function CreateCV() {
 
   const [mode, setMode] = useState('create'); // 'create' hoặc 'edit'
   const [loading, setLoading] = useState(true);
-  const [showWarningModal, setShowWarningModal] = useState(false); // Quản lý trạng thái đóng/mở popup cảnh báo
+  const [addingCategory, setAddingCategory] = useState(false); // Trạng thái loading khi bấm thêm category
+  const [addingSkill, setAddingSkill] = useState(false);       // Trạng thái loading khi bấm thêm skill
+  const [showWarningModal, setShowWarningModal] = useState(false); 
   const [skillSearch, setSkillSearch] = useState('');
   const [cvData, setCvData] = useState(INITIAL_EMPTY_FORM);
   const [avatarPreview, setAvatarPreview] = useState('');
@@ -48,13 +51,13 @@ export default function CreateCV() {
   const [systemCategories, setSystemCategories] = useState([]);
   const [systemSkills, setSystemSkills] = useState([]);
 
-  // ================= LUỒNG TỰ ĐỘNG GỌI API KHI VÀO TRANG =================
+  // ================= TỰ ĐỘNG NẠP DỮ LIỆU KHI VÀO TRANG =================
   useEffect(() => {
     const initPageData = async () => {
       if (!token) {
-      alert("Chức năng này yêu cầu đăng nhập. Vui lòng đăng nhập tài khoản ứng viên để tiếp tục!");
-      return;
-    }
+        alert("Chức năng này yêu cầu đăng nhập. Vui lòng đăng nhập tài khoản ứng viên để tiếp tục!");
+        return;
+      }
       try {        
         setLoading(true);
 
@@ -70,7 +73,7 @@ export default function CreateCV() {
           setSystemSkills(formDataRes.data.data.skills || []);
         }
 
-        // 2. Kiểm tra trạng thái điền thông tin của Hồ sơ ứng viên trong Database
+        // 2. Kiểm tra thông tin của Hồ sơ ứng viên
         try {
           const candidateRes = await axios.get(`${API_BASE_URL}/show-candidate`, {
             headers: {
@@ -81,28 +84,24 @@ export default function CreateCV() {
 
           if (candidateRes.data.success && candidateRes.data.data) {
             const backendData = candidateRes.data.data;
-            // Nhận diện biến cờ kiểm tra xem đã từng hoàn thiện form (lưu kỹ năng) chưa từ Backend
             const hasFilledForm = candidateRes.data.has_filled_form;
 
-            // Xử lý parse chuỗi JSON phòng chống lỗi runtime crash
             const parsedLinks = typeof backendData.links === 'string' ? JSON.parse(backendData.links) : backendData.links;
             const parsedReference = typeof backendData.contact_reference === 'string' ? JSON.parse(backendData.contact_reference) : backendData.contact_reference;
 
             if (hasFilledForm) {
               if (id) {
-                // 🟢 TRƯỜNG HỢP A: Người dùng bấm nút "SỬA" từ trang quản lý (Có ID trên URL)
-                // -> KHÔNG HIỆN POPUP, Đổ thẳng dữ liệu cũ vào Form để sửa luôn
                 setMode('edit');
 
-                const parsedLinks = typeof backendData.links === 'string' ? JSON.parse(backendData.links) : backendData.links;
-                const parsedReference = typeof backendData.contact_reference === 'string' ? JSON.parse(backendData.contact_reference) : backendData.contact_reference;
                 const parsedProjects = typeof backendData.project === 'string' ? JSON.parse(backendData.project) : backendData.project;
+                const matchedCategory = (formDataRes.data.data.categories || []).find(c => c.id === backendData.category_id);
 
                 setCvData({
                   ...INITIAL_EMPTY_FORM,
                   ...backendData,
                   birthday: backendData.birthday ? backendData.birthday.substring(0, 10) : '',
                   category_id: backendData.category_id ? String(backendData.category_id) : '',
+                  category_name_input: matchedCategory ? matchedCategory.name : '',
                   links: { ...INITIAL_EMPTY_FORM.links, ...parsedLinks },
                   contact_reference: { ...INITIAL_EMPTY_FORM.contact_reference, ...parsedReference },
                   project: parsedProjects?.length ? parsedProjects : INITIAL_EMPTY_FORM.project,
@@ -111,7 +110,6 @@ export default function CreateCV() {
                     name: s.name,
                     level: s.pivot?.level || 'Cơ bản'
                   })) : []
-                  
                 });
 
                 if (backendData.avatar_url) {
@@ -119,17 +117,14 @@ export default function CreateCV() {
                 }
 
               } else {
-                // 🛑 TRƯỜNG HỢP B: Người dùng bấm nút "TẠO MỚI" nhưng trong DB đã có dữ liệu rồi
-                // -> BẬT POPUP CẢNH BÁO hỏi ý kiến
                 setShowWarningModal(true);
                 window.cachedBackendData = backendData;
               }
 
             } else {
-              // 🟢 TRƯỜNG HỢP 2: Profile mặc định rỗng -> Đi thẳng vào form Tạo mới
               setMode('create');
+              const matchedCategory = (formDataRes.data.data.categories || []).find(c => c.id === backendData.category_id);
 
-              // Đổ thông tin cá nhân cơ bản (lấy từ User Đăng ký ban đầu), các phần Kỹ năng/Dự án giữ trống hoàn toàn
               setCvData({
                 ...INITIAL_EMPTY_FORM,
                 full_name: backendData.full_name || '',
@@ -139,6 +134,7 @@ export default function CreateCV() {
                 gender: backendData.gender || 'Nam',
                 birthday: backendData.birthday || '',
                 category_id: backendData.category_id ? String(backendData.category_id) : '',
+                category_name_input: matchedCategory ? matchedCategory.name : '',
                 links: { ...INITIAL_EMPTY_FORM.links, ...parsedLinks },
                 contact_reference: { ...INITIAL_EMPTY_FORM.contact_reference, ...parsedReference }
               });
@@ -164,23 +160,111 @@ export default function CreateCV() {
     initPageData();
   }, [id]);
 
-  // ================= XỬ LÝ SỰ KIỆN LỰA CHỌN TRÊN POPUP =================
+  // HÀM TẠO MỚI CATEGORY QUA API RIÊNG
+  const handleCreateCategory = async () => {
+    const nameToCreate = cvData.category_name_input?.trim();
+    if (!nameToCreate) {
+      alert("Vui lòng nhập tên danh mục/ngành nghề cần thêm!");
+      return;
+    }
 
-  // Hành động 1: Người dùng đồng ý chuyển hướng sang Chỉnh sửa/Cập nhật dữ liệu cũ
+    try {
+      setAddingCategory(true);
+      const res = await axios.post(`${API_BASE_URL}/create-category`, { name: nameToCreate }, {
+        headers: {
+          'Authorization': token ? `Bearer ${token}` : '',
+          'Accept': 'application/json'
+        }
+      });
+
+      if (res.data && res.data.success) {
+        const newCategory = res.data.data;
+        // Cập nhật danh sách hệ thống để datalist ghi nhận
+        setSystemCategories(prev => {
+          if (prev.some(c => c.id === newCategory.id)) return prev;
+          return [...prev, newCategory];
+        });
+        // Điền luôn ID và Tên mới vào Form hiện tại để chuẩn bị lưu CV
+        setCvData(prev => ({
+          ...prev,
+          category_id: String(newCategory.id),
+          category_name_input: newCategory.name
+        }));
+        alert(res.data.message || "Đã thêm danh mục mới vào hệ thống thành công!");
+      } else {
+        alert("Có lỗi xảy ra: " + (res.data?.message || "Không rõ nguyên nhân"));
+      }
+    } catch (error) {
+      console.error("Lỗi thêm danh mục:", error);
+      alert("Không thể tạo danh mục mới, vui lòng thử lại!");
+    } finally {
+      setAddingCategory(false);
+    }
+  };
+
+  // HÀM TẠO MỚI SKILL QUA API RIÊNG (Đã sửa lỗi hiển thị nhưng không chọn được)
+  const handleCreateSkill = async () => {
+    const nameToCreate = skillSearch.trim();
+    if (!nameToCreate) return;
+
+    try {
+      setAddingSkill(true);
+      const res = await axios.post(`${API_BASE_URL}/create-skill`, { name: nameToCreate }, {
+        headers: {
+          'Authorization': token ? `Bearer ${token}` : '',
+          'Accept': 'application/json'
+        }
+      });
+
+      if (res.data && res.data.success) {
+        const newSkill = res.data.data;
+        
+        // 1. Đưa kỹ năng mới vào bộ nhớ hệ thống chung
+        setSystemSkills(prev => {
+          if (prev.some(s => s.id === newSkill.id)) return prev;
+          return [...prev, newSkill];
+        });
+
+        // 2. Can thiệp đồng bộ: Đút trực tiếp skill mới vào danh sách lựa chọn của ứng viên (cvData.skills)
+        setCvData(prev => {
+          const isExist = prev.skills.some(s => s.id === newSkill.id);
+          if (isExist) return prev;
+          return {
+            ...prev,
+            skills: [...prev.skills, { id: newSkill.id, name: newSkill.name, level: 'Cơ bản' }]
+          };
+        });
+
+        // 3. Xóa ô tìm kiếm để đóng menu gợi ý
+        setSkillSearch('');
+        alert(res.data.message || "Đã thêm kỹ năng mới thành công!");
+      } else {
+        alert("Có lỗi xảy ra: " + (res.data?.message || "Không rõ nguyên nhân"));
+      }
+    } catch (error) {
+      console.error("Lỗi thêm kỹ năng:", error);
+      alert("Không thể tạo kỹ năng mới, vui lòng thử lại!");
+    } finally {
+      setAddingSkill(false);
+    }
+  };
+
+  // ================= XỬ LÝ EVENT GIAO DIỆN KHÁC =================
   const handleAcceptEdit = () => {
     setShowWarningModal(false);
     setMode('edit');
-
     const backendData = window.cachedBackendData;
     if (backendData) {
       const parsedLinks = typeof backendData.links === 'string' ? JSON.parse(backendData.links) : backendData.links;
       const parsedReference = typeof backendData.contact_reference === 'string' ? JSON.parse(backendData.contact_reference) : backendData.contact_reference;
       const parsedProjects = typeof backendData.project === 'string' ? JSON.parse(backendData.project) : backendData.project;
+      const matchedCategory = systemCategories.find(c => c.id === backendData.category_id);
 
       setCvData({
         ...INITIAL_EMPTY_FORM,
         ...backendData,
         category_id: backendData.category_id ? String(backendData.category_id) : '',
+        category_name_input: matchedCategory ? matchedCategory.name : '',
         links: { ...INITIAL_EMPTY_FORM.links, ...parsedLinks },
         contact_reference: { ...INITIAL_EMPTY_FORM.contact_reference, ...parsedReference },
         project: parsedProjects?.length ? parsedProjects : INITIAL_EMPTY_FORM.project,
@@ -197,27 +281,17 @@ export default function CreateCV() {
     }
   };
 
-  // Hành động 2: Người dùng quyết định Xóa hoàn toàn trên database để làm lại
   const handleResetAndCreateNew = async () => {
-    if (window.confirm("Hành động này sẽ xóa toàn bộ kỹ năng, dự án và thông tin CV cũ của bạn trên hệ thống. Bạn có chắc chắn muốn làm lại từ đầu?")) {
+    if (window.confirm("Hành động này sẽ xóa toàn bộ kỹ năng, dự án và thông tin CV cũ trên hệ thống. Xác nhận làm lại từ đầu?")) {
       try {
         setLoading(true);
         setShowWarningModal(false);
-        console.log('thành công')
-
         const deleteRes = await axios.delete(`${API_BASE_URL}/delete-candidate`, {
-          headers: {
-            'Authorization': token ? `Bearer ${token}` : '',
-            'Accept': 'application/json'
-          }
+          headers: { 'Authorization': token ? `Bearer ${token}` : '', 'Accept': 'application/json' }
         });
-
         if (deleteRes.status === 200 || deleteRes.data?.success) {
           setMode('create');
-
           const defaultInfo = deleteRes.data.data || {};
-          
-          // 🚀 Đã sửa: Sử dụng chuẩn dữ liệu từ defaultInfo do Backend trả về
           setCvData({
             ...INITIAL_EMPTY_FORM,
             full_name: defaultInfo.full_name || '',
@@ -228,73 +302,35 @@ export default function CreateCV() {
             birthday: defaultInfo.birthday || '',
             avatar_url: defaultInfo.avatar_url || '',
           });
-
-          // Hiển thị lại avatar cũ mượt mà trên giao diện
-          if (defaultInfo.avatar_url) {
-            setAvatarPreview(`http://localhost:8000/${defaultInfo.avatar_url}`);
-          } else {
-            setAvatarPreview('');
-          }
-          
-if (deleteRes.data.success) {
-    alert("Đã làm mới hồ sơ cũ thành công. Mời bạn tiến hành điền hồ sơ mới từ đầu!");
-    // Cùi bắp nhưng hiệu quả 100%: Ép trình duyệt tự reload giùm bro luôn!
-    window.location.reload(); 
-}        }
+          setAvatarPreview(defaultInfo.avatar_url ? `http://localhost:8000/${defaultInfo.avatar_url}` : '');
+          alert("Mời bạn tiến hành điền hồ sơ mới từ đầu!");
+          window.location.reload(); 
+        }
       } catch (err) {
-        console.error("Lỗi khi thực hiện xóa hồ sơ làm mới:", err);
-        alert("Không thể làm mới hồ sơ cũ, vui lòng thử lại sau!");
+        console.error(err);
+        alert("Không thể làm mới hồ sơ, thử lại sau!");
       } finally {
         setLoading(false);
       }
     }
   };
 
-  // ================= CHỨC NĂNG LÀM MỚI FORM TẠI CHỖ (GIỮ LẠI THÔNG TIN CƠ BẢN) =================
   const handleResetFormToBasic = () => {
-    // Xác nhận lần 1
-    const confirmFirst = window.confirm(
-      "Bạn có chắc chắn muốn làm mới form? Toàn bộ Kỹ năng, Dự án, Mục tiêu, Giới thiệu và Học vấn sẽ bị xóa sạch khỏi giao diện hiện tại."
-    );
-
-    if (confirmFirst) {
-      // Xác nhận lần 2 (Double Confirmation an toàn tuyệt đối)
-      const confirmSecond = window.confirm(
-        "Lưu ý: Các thông tin định danh cốt lõi như Họ tên, Ngày sinh, Số điện thoại, Email, Địa chỉ và Ảnh đại diện vẫn được GIỮ LẠI để tiết kiệm thời gian nhập liệu cho bạn. Xác nhận làm mới?"
-      );
-
-      if (confirmSecond) {
-        setCvData(prev => ({
-          ...INITIAL_EMPTY_FORM,
-          // GIỮ NGUYÊN các trường thông tin cơ bản
-          full_name: prev.full_name,
-          gender: prev.gender,
-          birthday: prev.birthday ? prev.birthday.substring(0, 10) : '',
-          email: prev.email,
-          phone: prev.phone,
-          address: prev.address,
-          avatar: prev.avatar,
-          avatar_url: prev.avatar_url,
-          category_id: prev.category_id,
-          cv_template_id: prev.cv_template_id,
-          links: prev.links, // Giữ lại link mxh nếu có
-          contact_reference: prev.contact_reference // Giữ lại thông tin người tham chiếu
-        }));
-
-        // Đưa ô tìm kiếm kỹ năng về rỗng
-        setSkillSearch('');
-        alert("Đã làm mới form thành công! Vui lòng điền các thông tin chuyên môn mới và nhấn nút Lưu hoặc Cập nhật.");
-      }
+    if (window.confirm("Xóa sạch mục tiêu, giới thiệu, học vấn và kỹ năng hiện tại trên form?")) {
+      setCvData(prev => ({
+        ...INITIAL_EMPTY_FORM,
+        full_name: prev.full_name, gender: prev.gender, birthday: prev.birthday ? prev.birthday.substring(0, 10) : '',
+        email: prev.email, phone: prev.phone, address: prev.address, avatar: prev.avatar, avatar_url: prev.avatar_url,
+        category_id: prev.category_id, category_name_input: prev.category_name_input, cv_template_id: prev.cv_template_id,
+        links: prev.links, contact_reference: prev.contact_reference 
+      }));
+      setSkillSearch('');
     }
   };
 
-  // Xử lý đổi Avatar kèm dọn dẹp bộ nhớ đệm
   const handleAvatarChange = (e) => {
     const file = e.target.files[0];
     if (file) {
-      if (avatarPreview && avatarPreview.startsWith('blob:')) {
-        URL.revokeObjectURL(avatarPreview);
-      }
       setCvData(prev => ({ ...prev, avatar: file }));
       setAvatarPreview(URL.createObjectURL(file));
     }
@@ -305,14 +341,21 @@ if (deleteRes.data.success) {
     setCvData(prev => ({ ...prev, [name]: value }));
   };
 
-  const handleNestedChange = (section, field, value) => {
+  // Đồng bộ ô nhập Category với danh sách gợi ý sẵn có
+  const handleCategoryInputChange = (e) => {
+    const val = e.target.value;
+    const matchedCat = systemCategories.find(c => c.name.toLowerCase() === val.toLowerCase());
     setCvData(prev => ({
       ...prev,
-      [section]: { ...prev[section], [field]: value }
+      category_name_input: val,
+      category_id: matchedCat ? String(matchedCat.id) : '' // Tự gõ từ mới thì ID tạm thời để rỗng để bắt sự kiện hiện nút Thêm mới
     }));
   };
 
-  // LOGIC ĐIỀU KHIỂN MẢNG DỰ ÁN
+  const handleNestedChange = (section, field, value) => {
+    setCvData(prev => ({ ...prev, [section]: { ...prev[section], [field]: value } }));
+  };
+
   const handleProjectChange = (index, field, value) => {
     const updatedProjects = [...cvData.project];
     updatedProjects[index][field] = value;
@@ -320,10 +363,7 @@ if (deleteRes.data.success) {
   };
 
   const handleAddProject = () => {
-    setCvData(prev => ({
-      ...prev,
-      project: [...prev.project, { project_name: '', role: '', duration: '', description: '' }]
-    }));
+    setCvData(prev => ({ ...prev, project: [...prev.project, { project_name: '', role: '', duration: '', description: '' }] }));
   };
 
   const handleRemoveProject = (index) => {
@@ -332,7 +372,6 @@ if (deleteRes.data.success) {
     }
   };
 
-  // LOGIC ĐIỀU KHIỂN DANH SÁCH KỸ NĂNG
   const handleAddSkill = (skillItem) => {
     const isExist = cvData.skills.some(s => s.id === skillItem.id);
     if (!isExist) {
@@ -345,10 +384,7 @@ if (deleteRes.data.success) {
   };
 
   const handleLevelChange = (skillId, newLevel) => {
-    setCvData(prev => ({
-      ...prev,
-      skills: prev.skills.map(s => s.id === skillId ? { ...s, level: newLevel } : s)
-    }));
+    setCvData(prev => ({ ...prev, skills: prev.skills.map(s => s.id === skillId ? { ...s, level: newLevel } : s) }));
   };
 
   const handleRemoveSkill = (skillId) => {
@@ -359,18 +395,20 @@ if (deleteRes.data.success) {
     ? []
     : systemSkills.filter(s => s.name.toLowerCase().includes(skillSearch.toLowerCase()));
 
-  // ================= ĐÓNG GÓI FORM_DATA VÀ GỬI LÊN LARAVEL =================
-const handleSubmit = async (e) => {
-    e.preventDefault();
+  const exactSkillMatch = systemSkills.some(s => s.name.toLowerCase() === skillSearch.trim().toLowerCase());
 
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (!cvData.category_id) {
+      alert("Vui lòng chọn danh mục từ gợi ý hoặc ấn nút 'Thêm mới danh mục' bên cạnh ô nhập!");
+      return;
+    }
     if (!cvData.skills || cvData.skills.length === 0) {
-      alert("Vui lòng chọn ít nhất một kỹ năng chuyên môn!");
+      alert("Vui lòng thêm ít nhất một kỹ năng chuyên môn!");
       return;
     }
 
     const formData = new FormData();
-
-    // Các trường text thông thường giữ nguyên
     formData.append('title', cvData.title || '');
     formData.append('category_id', cvData.category_id || '');
     formData.append('cv_template_id', cvData.cv_template_id || 1);
@@ -384,69 +422,23 @@ const handleSubmit = async (e) => {
     formData.append('objective', cvData.objective || '');
     formData.append('experience_years', cvData.experience_years || 0);
     formData.append('education', cvData.education || '');
-
-    if (cvData.avatar) {
-      formData.append('avatar', cvData.avatar);
-    }
-
-    // 🚀 THAY THẾ KHÚC NÀY: Gom toàn bộ object/mảng phức tạp thành JSON string siêu gọn
+    if (cvData.avatar) formData.append('avatar', cvData.avatar);
     formData.append('links', JSON.stringify(cvData.links || { github: '', linkedin: '' }));
     formData.append('contact_reference', JSON.stringify(cvData.contact_reference || { name: '', phone: '', relationship: '' }));
     formData.append('project', JSON.stringify(cvData.project || []));
-    
-    const cleanedSkills = cvData.skills.map(s => ({
-      id: s.id,
-      level: s.level || 'Cơ bản'
-    }));
-    formData.append('skills', JSON.stringify(cleanedSkills));
+    formData.append('skills', JSON.stringify(cvData.skills.map(s => ({ id: s.id, level: s.level || 'Cơ bản' }))));
 
     try {
       const response = await axios.post(`${API_BASE_URL}/save`, formData, {
-        headers: {
-          'Authorization': token ? `Bearer ${token}` : '',
-          'Accept': 'application/json',
-          'Content-Type': 'multipart/form-data'
-        }
+        headers: { 'Authorization': token ? `Bearer ${token}` : '', 'Accept': 'application/json', 'Content-Type': 'multipart/form-data' }
       });
-
       if (response.data.success) {
         alert(mode === 'edit' ? 'Cập nhật hồ sơ thành công!' : 'Tạo mới hồ sơ ứng viên thành công!');
         navigate('/cv-management');
       }
     } catch (error) {
-      console.error("Lỗi gửi dữ liệu lên Server:", error);
-
-      // BẮT LỖI VALIDATION 422 TỪ LARAVEL VÀ THÔNG BÁO RÕ RÀNG
-      if (error.response && error.response.status === 422) {
-        const validationErrors = error.response.data.errors;
-
-        // Tạo một mảng chứa các câu dịch lỗi thân thiện
-        let errorMessages = [];
-
-        if (validationErrors.avatar) {
-          errorMessages.push("⚠️ Ảnh đại diện quá nặng! Vui lòng chọn ảnh dưới 2MB.");
-        }
-        if (validationErrors.title) {
-          errorMessages.push("⚠️ Vui lòng nhập Vị trí ứng tuyển / Tiêu đề CV.");
-        }
-        if (validationErrors.skills) {
-          errorMessages.push("⚠️ Bạn phải chọn ít nhất 1 kỹ năng chuyên môn.");
-        }
-        if (validationErrors.project) {
-          errorMessages.push("⚠️ Thông tin các Dự án thực tế chưa hợp lệ.");
-        }
-
-        // Nếu có lỗi nằm trong danh sách dịch thì hiện ra
-        if (errorMessages.length > 0) {
-          alert(errorMessages.join("\n"));
-        } else {
-          // Phòng hờ các lỗi validation khác chưa định nghĩa câu dịch tiếng Việt
-          const firstErrorKey = Object.keys(validationErrors)[0];
-          alert(`Lỗi nhập liệu: ${validationErrors[firstErrorKey][0]}`);
-        }
-      } else {
-        alert("❌ Đã xảy ra lỗi hệ thống khi lưu, vui lòng kiểm tra lại kết nối mạng hoặc dữ liệu!");
-      }
+      console.error(error);
+      alert("Lỗi hệ thống khi lưu, vui lòng kiểm tra lại dữ liệu!");
     }
   };
 
@@ -470,12 +462,12 @@ const handleSubmit = async (e) => {
               <h1 className="text-2xl font-bold text-slate-800">
                 {mode === 'edit' ? 'Cập nhật Thông tin Hồ sơ' : 'Khai báo Thông tin Hồ sơ Ứng viên'}
               </h1>
-              <p className="text-slate-400 text-sm mt-1">Hệ thống đang chạy ở chế độ: <span className="font-bold uppercase text-blue-600">{mode === 'edit' ? 'Cập nhật' : 'Tạo mới'}</span></p>
+              <p className="text-slate-400 text-sm mt-1">Chế độ hiện tại: <span className="font-bold uppercase text-blue-600">{mode === 'edit' ? 'Cập nhật' : 'Tạo mới'}</span></p>
             </div>
             <button
               type="button"
               onClick={() => navigate('/cv-management')}
-              className="inline-flex items-center gap-2 px-4 py-2 border border-slate-200 hover:border-slate-300 rounded-xl bg-slate-50 hover:bg-slate-100 text-slate-600 font-semibold text-sm shadow-sm transition"
+              className="inline-flex items-center gap-2 px-4 py-2 border border-slate-200 rounded-xl bg-slate-50 hover:bg-slate-100 text-slate-600 font-semibold text-sm transition shadow-sm"
             >
               <ArrowLeft size={16} /> Quay lại quản lý
             </button>
@@ -483,7 +475,7 @@ const handleSubmit = async (e) => {
 
           <div className="space-y-6">
 
-            {/* PHẦN 1. THÔNG TIN CÁ NHÂN & LIÊN HỆ */}
+            {/* THÔNG TIN CÁ NHÂN & LIÊN HỆ */}
             <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100">
               <div className="flex items-center gap-2.5 pb-4 mb-6 border-b border-slate-100">
                 <div className="p-2 bg-blue-50 text-blue-600 rounded-lg"><User size={20} /></div>
@@ -491,7 +483,6 @@ const handleSubmit = async (e) => {
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                {/* Khu vực chọn Avatar */}
                 <div className="flex flex-col items-center justify-center border-2 border-dashed border-slate-200 rounded-xl p-6 bg-slate-50/50 hover:border-blue-400 transition relative w-full max-w-sm mx-auto h-fit">
                   {avatarPreview ? (
                     <img src={avatarPreview} alt="Avatar" className="w-24 h-24 rounded-full object-cover ring-4 ring-slate-100 mb-3" />
@@ -506,7 +497,6 @@ const handleSubmit = async (e) => {
                   </label>
                 </div>
 
-                {/* Ô nhập thông tin cơ bản */}
                 <div className="md:col-span-2 grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="sm:col-span-2 bg-blue-50/40 p-3 rounded-xl border border-blue-100/70">
                     <label className="block text-xs font-bold text-blue-700 mb-1 flex items-center gap-1.5">
@@ -519,54 +509,64 @@ const handleSubmit = async (e) => {
                       value={cvData.title || ''}
                       onChange={handleBaseChange}
                       placeholder="VD: Lập trình viên Fullstack / Chuyên viên Thiết kế đồ họa..."
-                      className="w-full px-3 py-2 bg-white border border-blue-200 focus:border-blue-500 rounded-xl text-sm font-semibold outline-none focus:ring-4 focus:ring-blue-500/10 placeholder-slate-400 transition"
+                      className="w-full px-3 py-2 bg-white border border-blue-200 focus:border-blue-500 rounded-xl text-sm font-semibold outline-none placeholder-slate-400 transition"
                     />
                   </div>
 
                   <div className="sm:col-span-2">
-                    <label className="block text-xs font-semibold text-slate-500 mb-1">Ngành nghề thuộc hệ thống *</label>
-                    <select required name="category_id" value={cvData.category_id || ''} onChange={handleBaseChange} className="w-full px-3 py-2 border rounded-xl text-sm bg-white outline-none">
-                      <option value="">-- Click chọn ngành nghề mong muốn --</option>
-                      {systemCategories.map(cat => (
-                        <option key={cat.id} value={String(cat.id)}>{cat.name}</option>
-                      ))}
-                    </select>
+                    <label className="block text-xs font-semibold text-slate-500 mb-1">
+                      Ngành nghề ứng tuyển * {cvData.category_id ? <span className="text-emerald-600 font-bold">(Đã khớp ID: {cvData.category_id})</span> : <span className="text-amber-600 font-medium">(Ngành nghề mới)</span>}
+                    </label>
+                    <div className="flex gap-2">
+                      <div className="relative flex-1">
+                        <input
+                          required
+                          type="text"
+                          list="categories-datalist"
+                          value={cvData.category_name_input || ''}
+                          onChange={handleCategoryInputChange}
+                          placeholder="Chọn từ danh sách hoặc tự gõ ngành nghề mới..."
+                          className="w-full px-3 py-2 border rounded-xl text-sm bg-white outline-none focus:border-blue-500"
+                        />
+                        <datalist id="categories-datalist">
+                          {systemCategories.map(cat => (
+                            <option key={cat.id} value={cat.name} />
+                          ))}
+                        </datalist>
+                      </div>
+                      
+                      {!cvData.category_id && cvData.category_name_input?.trim() && (
+                        <button
+                          type="button"
+                          disabled={addingCategory}
+                          onClick={handleCreateCategory}
+                          className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl transition flex items-center gap-1 shrink-0 shadow-sm"
+                        >
+                          {addingCategory ? <Loader2 size={14} className="animate-spin" /> : <Plus size={14} />}
+                          Thêm mới danh mục
+                        </button>
+                      )}
+                    </div>
                   </div>
-                  <div>
-                    <label className="block text-xs font-semibold text-slate-500 mb-1">Họ và tên ứng viên *</label>
-                    <input required type="text" name="full_name" value={cvData.full_name || ''} onChange={handleBaseChange} placeholder="VD: Nguyễn Văn A" className="w-full px-3 py-2 border rounded-xl text-sm outline-none" />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-semibold text-slate-500 mb-1">Số điện thoại liên hệ *</label>
-                    <input required type="tel" name="phone" value={cvData.phone || ''} onChange={handleBaseChange} placeholder="VD: 0901234567" className="w-full px-3 py-2 border rounded-xl text-sm outline-none" />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-semibold text-slate-500 mb-1">Địa chỉ Email hiển thị trên CV *</label>
-                    <input required type="email" name="email" value={cvData.email || ''} onChange={handleBaseChange} placeholder="VD: nguyenvana@gmail.com" className="w-full px-3 py-2 border rounded-xl text-sm outline-none" />
-                  </div>
+
+                  <div><label className="block text-xs font-semibold text-slate-500 mb-1">Họ và tên *</label><input required type="text" name="full_name" value={cvData.full_name || ''} onChange={handleBaseChange} className="w-full px-3 py-2 border rounded-xl text-sm outline-none" /></div>
+                  <div><label className="block text-xs font-semibold text-slate-500 mb-1">Số điện thoại *</label><input required type="tel" name="phone" value={cvData.phone || ''} onChange={handleBaseChange} className="w-full px-3 py-2 border rounded-xl text-sm outline-none" /></div>
+                  <div><label className="block text-xs font-semibold text-slate-500 mb-1">Email *</label><input required type="email" name="email" value={cvData.email || ''} onChange={handleBaseChange} className="w-full px-3 py-2 border rounded-xl text-sm outline-none" /></div>
                   <div className="grid grid-cols-2 gap-2">
                     <div>
                       <label className="block text-xs font-semibold text-slate-500 mb-1">Giới tính</label>
                       <select name="gender" value={cvData.gender || 'Nam'} onChange={handleBaseChange} className="w-full px-3 py-2 border rounded-xl text-sm bg-white outline-none">
-                        <option value="Nam">Nam</option>
-                        <option value="Nữ">Nữ</option>
-                        <option value="Khác">Khác</option>
+                        <option value="Nam">Nam</option><option value="Nữ">Nữ</option><option value="Khác">Khác</option>
                       </select>
                     </div>
-                    <div>
-                      <label className="block text-xs font-semibold text-slate-500 mb-1">Ngày sinh</label>
-                      <input type="date" name="birthday" value={cvData.birthday || ''} onChange={handleBaseChange} className="w-full px-3 py-2 border rounded-xl text-sm outline-none" />
-                    </div>
+                    <div><label className="block text-xs font-semibold text-slate-500 mb-1">Ngày sinh</label><input type="date" name="birthday" value={cvData.birthday || ''} onChange={handleBaseChange} className="w-full px-3 py-2 border rounded-xl text-sm outline-none" /></div>
                   </div>
-                  <div className="sm:col-span-2">
-                    <label className="block text-xs font-semibold text-slate-500 mb-1">Địa chỉ cư trú hiện tại</label>
-                    <input type="text" name="address" value={cvData.address || ''} onChange={handleBaseChange} placeholder="VD: Quận 5, TP. Hồ Chí Minh" className="w-full px-3 py-2 border rounded-xl text-sm outline-none" />
-                  </div>
+                  <div className="sm:col-span-2"><label className="block text-xs font-semibold text-slate-500 mb-1">Địa chỉ cư trú</label><input type="text" name="address" value={cvData.address || ''} onChange={handleBaseChange} className="w-full px-3 py-2 border rounded-xl text-sm outline-none" /></div>
                 </div>
               </div>
             </div>
 
-            {/* CÁC PHẦN LIÊN KẾT MẠNG XÃ HỘI & NGƯỜI THAM CHIẾU */}
+            {/* LIÊN KẾT & THAM CHIẾU */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100">
                 <div className="flex items-center gap-2 pb-3 mb-4 border-b text-indigo-600"><Link size={18} /> <h3 className="font-bold text-slate-800 text-base">Liên kết mạng xã hội</h3></div>
@@ -647,8 +647,10 @@ const handleSubmit = async (e) => {
                   <Search size={16} className="text-slate-400" />
                   <input type="text" value={skillSearch} onChange={(e) => setSkillSearch(e.target.value)} placeholder="Nhập tên kỹ năng..." className="w-full bg-transparent outline-none text-sm text-slate-700" />
                 </div>
-                {filteredSkillSuggestions.length > 0 && (
-                  <div className="absolute left-0 right-0 mt-1 bg-white border border-slate-200 rounded-xl shadow-lg z-10 max-h-48 overflow-y-auto divide-y">
+                
+                {/* MENU GỢI Ý SKILLS */}
+                {skillSearch.trim() !== '' && (
+                  <div className="absolute left-0 right-0 mt-1 bg-white border border-slate-200 rounded-xl shadow-lg z-10 max-h-56 overflow-y-auto divide-y">
                     {filteredSkillSuggestions.map((skill) => {
                       const isChosen = (cvData.skills || []).some(s => s.id === skill.id);
                       return (
@@ -658,9 +660,25 @@ const handleSubmit = async (e) => {
                         </button>
                       );
                     })}
+
+                    {!exactSkillMatch && (
+                      <button
+                        type="button"
+                        disabled={addingSkill}
+                        onClick={handleCreateSkill}
+                        className="w-full px-4 py-3 bg-purple-50 hover:bg-purple-100 text-left text-xs font-bold text-purple-700 flex items-center justify-between transition"
+                      >
+                        <span className="flex items-center gap-1.5">
+                          {addingSkill ? <Loader2 size={14} className="animate-spin" /> : <Plus size={14} />}
+                          Không tìm thấy? Bấm để tự tạo kĩ năng mới: "{skillSearch}"
+                        </span>
+                        <span className="text-[10px] bg-purple-200 px-2 py-0.5 rounded text-purple-800">Tạo mới</span>
+                      </button>
+                    )}
                   </div>
                 )}
               </div>
+              
               <div className="space-y-2 pt-2">
                 <span className="text-xs font-bold text-slate-500 block">Bước 2: Chọn cấp độ cho kỹ năng</span>
                 {cvData.skills && cvData.skills.length > 0 ? (
@@ -687,7 +705,6 @@ const handleSubmit = async (e) => {
 
           {/* ACTIONS FOOTER */}
           <div className="flex justify-end gap-3 pt-4 border-t border-slate-200">
-            {/* NÚT LÀM MỚI FORM ĐƯỢC THÊM VÀO ĐÂY */}
             <button
               type="button"
               onClick={handleResetFormToBasic}
@@ -705,10 +722,10 @@ const handleSubmit = async (e) => {
         </form>
       </div>
 
-      {/* ================= MODAL CẢNH BÁO TRÙNG LẶP HỒ SƠ trực tuyến ================= */}
+      {/* WARNING MODAL */}
       {showWarningModal && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl p-6 max-w-md w-full shadow-2xl border border-slate-100 text-center space-y-4 animate-in fade-in zoom-in-95 duration-200">
+          <div className="bg-white rounded-2xl p-6 max-w-md w-full shadow-2xl border border-slate-100 text-center space-y-4">
             <div className="w-12 h-12 rounded-full bg-amber-50 text-amber-600 flex items-center justify-center mx-auto shadow-sm">
               <ShieldAlert size={24} />
             </div>
@@ -719,27 +736,9 @@ const handleSubmit = async (e) => {
               </p>
             </div>
             <div className="flex flex-col gap-2 pt-2">
-              <button
-                type="button"
-                onClick={handleAcceptEdit}
-                className="w-full py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-sm font-semibold shadow-md hover:shadow-lg transition duration-200"
-              >
-                Tiếp tục Chỉnh sửa / Cập nhật hồ sơ cũ
-              </button>
-              <button
-                type="button"
-                onClick={handleResetAndCreateNew}
-                className="w-full py-2.5 bg-rose-50 hover:bg-rose-100 text-rose-600 rounded-xl text-sm font-semibold transition duration-200"
-              >
-                Xóa hồ sơ cũ &rarr; Tạo mới hoàn toàn
-              </button>
-              <button
-                type="button"
-                onClick={() => navigate('/cv-management')}
-                className="w-full py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-xl text-sm font-medium transition duration-200"
-              >
-                Hủy bỏ và Quay lại
-              </button>
+              <button type="button" onClick={handleAcceptEdit} className="w-full py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-sm font-semibold shadow-md">Tiếp tục Chỉnh sửa / Cập nhật hồ sơ cũ</button>
+              <button type="button" onClick={handleResetAndCreateNew} className="w-full py-2.5 bg-rose-50 hover:bg-rose-100 text-rose-600 rounded-xl text-sm font-semibold">Xóa hồ sơ cũ &rarr; Tạo mới hoàn toàn</button>
+              <button type="button" onClick={() => navigate('/cv-management')} className="w-full py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-xl text-sm font-medium">Hủy bỏ và Quay lại</button>
             </div>
           </div>
         </div>

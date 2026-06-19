@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { 
   Briefcase, 
@@ -9,55 +9,97 @@ import {
   Eye, 
   FileCheck, 
   Calendar,
-  DollarSign
+  DollarSign,
+  Loader2
 } from 'lucide-react';
+import axios from 'axios';
+
+const API_BASE_URL = 'http://localhost:8000/api/admin/moderation';
+const token = localStorage.getItem('token'); // Token quyền Admin
 
 export default function SystemModeration() {
-  // Quản lý Tab hiện tại: 'jobs' (Kiểm duyệt tin) hoặc 'companies' (Kiểm duyệt công ty)
-
-// ... bên trong component SystemModeration ...
-const [searchParams, setSearchParams] = useSearchParams();
-// Lấy tab từ URL (ví dụ: ?tab=companies), nếu không có mặc định là 'jobs'
-const activeTab = searchParams.get('tab') || 'jobs'; 
-
-const setActiveTab = (tabName) => {
-  setSearchParams({ tab: tabName });
-};
+  const [searchParams, setSearchParams] = useSearchParams();
+  const activeTab = searchParams.get('tab') || 'jobs'; 
   const [searchTerm, setSearchTerm] = useState('');
+  const [loading, setLoading] = useState(false);
 
-  // 1. Dữ liệu giả lập Tin tuyển dụng chờ duyệt
-  const [pendingJobs, setPendingJobs] = useState([
-    { id: 'JOB001', title: 'Senior Frontend Developer (ReactJS)', company: 'Công ty TNHH TechNova', date: '06/06/2026', salary: '25 - 35 triệu', location: 'TP. Hồ Chí Minh' },
-    { id: 'JOB002', title: 'Chuyên viên Marketing Digital', company: 'Global Solutions Corp', date: '05/06/2026', salary: '15 - 20 triệu', location: 'Hà Nội' },
-    { id: 'JOB003', title: 'NodeJS Backend Engineer', company: 'Nippon Tech Việt Nam', date: '04/06/2026', salary: 'Thỏa thuận', location: 'Đà Nẵng' },
-  ]);
+  // Lưu trữ dữ liệu thực tế từ API
+  const [pendingJobs, setPendingJobs] = useState([]);
+  const [pendingCompanies, setPendingCompanies] = useState([]);
 
-  // 2. Dữ liệu giả lập Công ty/Doanh nghiệp mới đăng ký chờ xác minh
-  const [pendingCompanies, setPendingCompanies] = useState([
-    { id: 'COM001', name: 'Tập đoàn Công nghệ VinAI', taxCode: '0102345678', scale: '100-500 nhân sự', date: '06/06/2026', website: 'https://vinai.io' },
-    { id: 'COM002', name: 'Công ty Cổ phần Giáo dục EdTech', taxCode: '0314987654', scale: '20-50 nhân sự', date: '05/06/2026', website: 'https://edtech.edu.vn' },
-  ]);
+  // Hàm điều hướng tab
+  const setActiveTab = (tabName) => {
+    setSearchParams({ tab: tabName });
+  };
 
-  // Hàm xử lý Duyệt tin / Duyệt công ty
-  const handleApprove = (id, name, type) => {
-    alert(`Đã PHÊ DUYỆT ${type === 'job' ? 'tin tuyển dụng' : 'doanh nghiệp'}: ${name}`);
-    if (type === 'job') {
-      setPendingJobs(pendingJobs.filter(job => job.id !== id));
-    } else {
-      setPendingCompanies(pendingCompanies.filter(com => com.id !== id));
+  // Cấu hình Header gửi kèm Token Admin
+  const apiHeaders = {
+    headers: {
+      'Authorization': `Bearer ${token}`,
+      'Accept': 'application/json'
     }
   };
 
-  // Hàm xử lý Từ chối / Hạ tin
-  const handleReject = (id, name, type) => {
-    const reason = prompt(`Nhập lý do TỪ CHỐI ${type === 'job' ? 'tin' : 'doanh nghiệp'} này:`);
-    if (reason !== null) {
-      alert(`Đã TỪ CHỐI với lý do: ${reason || 'Không có lý do cụ thể'}`);
-      if (type === 'job') {
-        setPendingJobs(pendingJobs.filter(job => job.id !== id));
+  // Hàm tải dữ liệu tương ứng với Tab hiện tại
+  const fetchModerationData = async () => {
+    try {
+      setLoading(true);
+      if (activeTab === 'jobs') {
+        const res = await axios.get(`${API_BASE_URL}/jobs?search=${searchTerm}`, apiHeaders);
+        if (res.data.success) setPendingJobs(res.data.data);
       } else {
-        setPendingCompanies(pendingCompanies.filter(com => com.id !== id));
+        const res = await axios.get(`${API_BASE_URL}/companies?search=${searchTerm}`, apiHeaders);
+        if (res.data.success) setPendingCompanies(res.data.data);
       }
+    } catch (error) {
+      console.error("Lỗi lấy dữ liệu kiểm duyệt:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Tải lại dữ liệu khi đổi Tab hoặc kết thúc gõ tìm kiếm (Debounce nếu cần)
+  useEffect(() => {
+    fetchModerationData();
+  }, [activeTab, searchTerm]);
+
+  // Hàm xử lý Duyệt (Approve) bằng API
+  const handleApprove = async (id, name, type) => {
+    if (!window.confirm(`Xác nhận PHÊ DUYỆT ${type === 'job' ? 'tin đăng' : 'doanh nghiệp'}: ${name}?`)) return;
+    
+    try {
+      const endpoint = type === 'job' ? `/jobs/${id}/approve` : `/companies/${id}/approve`;
+      const res = await axios.put(`${API_BASE_URL}${endpoint}`, {}, apiHeaders);
+      
+      if (res.data.success) {
+        alert(res.data.message);
+        // Tải lại danh sách để đồng bộ UI
+        fetchModerationData();
+      }
+    } catch (error) {
+      alert("Thao tác thất bại, vui lòng thử lại!");
+    }
+  };
+
+  // Hàm xử lý Từ chối (Reject) bằng API
+  const handleReject = async (id, name, type) => {
+    const reason = prompt(`Nhập lý do TỪ CHỐI ${type === 'job' ? 'tin' : 'doanh nghiệp'} này:`);
+    if (reason === null) return; // Nhấn Cancel
+    if (!reason.trim()) {
+      alert("Vui lòng nhập lý do cụ thể!");
+      return;
+    }
+
+    try {
+      const endpoint = type === 'job' ? `/jobs/${id}/reject` : `/companies/${id}/reject`;
+      const res = await axios.put(`${API_BASE_URL}${endpoint}`, { reason: reason }, apiHeaders);
+      
+      if (res.data.success) {
+        alert(res.data.message);
+        fetchModerationData();
+      }
+    } catch (error) {
+      alert("Thao tác thất bại!");
     }
   };
 
@@ -74,14 +116,12 @@ const setActiveTab = (tabName) => {
         </div>
       </div>
 
-      {/* THANH ĐIỀU HƯỚNG TAB CHỨC NĂNG */}
+      {/* THANH ĐIỀU HƯỚNG TAB */}
       <div className="flex border-b border-slate-200 bg-white p-2 rounded-xl shadow-sm gap-2">
         <button
           onClick={() => { setActiveTab('jobs'); setSearchTerm(''); }}
           className={`flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-semibold transition-all ${
-            activeTab === 'jobs'
-              ? 'bg-blue-600 text-white shadow-md shadow-blue-100'
-              : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
+            activeTab === 'jobs' ? 'bg-blue-600 text-white shadow-md' : 'text-slate-600 hover:bg-slate-50'
           }`}
         >
           <Briefcase className="w-4 h-4" />
@@ -90,9 +130,7 @@ const setActiveTab = (tabName) => {
         <button
           onClick={() => { setActiveTab('companies'); setSearchTerm(''); }}
           className={`flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-semibold transition-all ${
-            activeTab === 'companies'
-              ? 'bg-blue-600 text-white shadow-md shadow-blue-100'
-              : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
+            activeTab === 'companies' ? 'bg-blue-600 text-white shadow-md' : 'text-slate-600 hover:bg-slate-50'
           }`}
         >
           <Building2 className="w-4 h-4" />
@@ -110,9 +148,10 @@ const setActiveTab = (tabName) => {
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
         />
+        {loading && <Loader2 className="w-4 h-4 text-blue-600 animate-spin ml-2" />}
       </div>
 
-      {/* KHỐI NỘI DUNG CHÍNH (TABLES) */}
+      {/* KHỐI NỘI DUNG CHÍNH */}
       <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
         
         {/* TAB 1: BẢNG KIỂM DUYỆT TIN ĐĂNG */}
@@ -129,42 +168,40 @@ const setActiveTab = (tabName) => {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 text-sm">
-                {pendingJobs
-                  .filter(job => job.title.toLowerCase().includes(searchTerm.toLowerCase()) || job.company.toLowerCase().includes(searchTerm.toLowerCase()))
-                  .map((job) => (
-                    <tr key={job.id} className="hover:bg-slate-50/80 transition-colors">
-                      <td className="px-6 py-4">
-                        <div className="font-semibold text-slate-800">{job.title}</div>
-                        <div className="text-xs text-slate-400 mt-0.5">ID: {job.id}</div>
-                      </td>
-                      <td className="px-6 py-4 text-slate-600 font-medium">{job.company}</td>
-                      <td className="px-6 py-4">
-                        <div className="text-slate-700 flex items-center gap-1"><DollarSign className="w-3.5 h-3.5 text-slate-400" />{job.salary}</div>
-                        <div className="text-xs text-slate-400 mt-0.5">{job.location}</div>
-                      </td>
-                      <td className="px-6 py-4 text-slate-500 flex items-center gap-1.5 pt-6">
-                        <Calendar className="w-3.5 h-3.5 text-slate-400" /> {job.date}
-                      </td>
-                      <td className="px-6 py-4 text-right space-x-2">
-                        <button className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors" title="Xem chi tiết nội dung tin">
-                          <Eye className="w-4 h-4 inline" />
-                        </button>
-                        <button 
-                          onClick={() => handleApprove(job.id, job.title, 'job')}
-                          className="px-3 py-1.5 bg-emerald-50 text-emerald-600 hover:bg-emerald-600 hover:text-white rounded-lg font-semibold text-xs inline-flex items-center gap-1 transition-all"
-                        >
-                          <Check className="w-3.5 h-3.5" /> Duyệt
-                        </button>
-                        <button 
-                          onClick={() => handleReject(job.id, job.title, 'job')}
-                          className="px-3 py-1.5 bg-red-50 text-red-600 hover:bg-red-600 hover:text-white rounded-lg font-semibold text-xs inline-flex items-center gap-1 transition-all"
-                        >
-                          <X className="w-3.5 h-3.5" /> Từ chối
-                        </button>
-                      </td>
-                    </tr>
+                {pendingJobs.map((job) => (
+                  <tr key={job.id} className="hover:bg-slate-50/80 transition-colors">
+                    <td className="px-6 py-4">
+                      <div className="font-semibold text-slate-800">{job.title}</div>
+                      <div className="text-xs text-slate-400 mt-0.5">ID: {job.id}</div>
+                    </td>
+                    <td className="px-6 py-4 text-slate-600 font-medium">{job.company?.company_name || 'N/A'}</td>
+                    <td className="px-6 py-4">
+                      <div className="text-slate-700 flex items-center gap-1"><DollarSign className="w-3.5 h-3.5 text-slate-400" />{job.salary || 'Thỏa thuận'}</div>
+                      <div className="text-xs text-slate-400 mt-0.5">{job.location}</div>
+                    </td>
+                    <td className="px-6 py-4 text-slate-500 flex items-center gap-1.5 pt-6">
+                      <Calendar className="w-3.5 h-3.5 text-slate-400" /> {job.created_at ? job.created_at.substring(0, 10) : 'N/A'}
+                    </td>
+                    <td className="px-6 py-4 text-right space-x-2">
+                      <button className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg" title="Xem chi tiết">
+                        <Eye className="w-4 h-4 inline" />
+                      </button>
+                      <button 
+                        onClick={() => handleApprove(job.id, job.title, 'job')}
+                        className="px-3 py-1.5 bg-emerald-50 text-emerald-600 hover:bg-emerald-600 hover:text-white rounded-lg font-semibold text-xs inline-flex items-center gap-1 transition-all"
+                      >
+                        <Check className="w-3.5 h-3.5" /> Duyệt
+                      </button>
+                      <button 
+                        onClick={() => handleReject(job.id, job.title, 'job')}
+                        className="px-3 py-1.5 bg-red-50 text-red-600 hover:bg-red-600 hover:text-white rounded-lg font-semibold text-xs inline-flex items-center gap-1 transition-all"
+                      >
+                        <X className="w-3.5 h-3.5" /> Từ chối
+                      </button>
+                    </td>
+                  </tr>
                 ))}
-                {pendingJobs.length === 0 && (
+                {pendingJobs.length === 0 && !loading && (
                   <tr>
                     <td colSpan="5" className="px-6 py-12 text-center text-slate-400">Không có tin đăng nào cần kiểm duyệt.</td>
                   </tr>
@@ -188,39 +225,37 @@ const setActiveTab = (tabName) => {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 text-sm">
-                {pendingCompanies
-                  .filter(com => com.name.toLowerCase().includes(searchTerm.toLowerCase()) || com.taxCode.includes(searchTerm))
-                  .map((com) => (
-                    <tr key={com.id} className="hover:bg-slate-50/80 transition-colors">
-                      <td className="px-6 py-4">
-                        <div className="font-semibold text-slate-800">{com.name}</div>
-                        <a href={com.website} target="_blank" rel="noreferrer" className="text-xs text-blue-500 hover:underline mt-0.5 block">{com.website}</a>
-                      </td>
-                      <td className="px-6 py-4 font-mono text-slate-600 font-medium">{com.taxCode}</td>
-                      <td className="px-6 py-4 text-slate-600">{com.scale}</td>
-                      <td className="px-6 py-4 text-slate-500 flex items-center gap-1.5 pt-6">
-                        <Calendar className="w-3.5 h-3.5 text-slate-400" /> {com.date}
-                      </td>
-                      <td className="px-6 py-4 text-right space-x-2">
-                        <button className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors" title="Xem giấy phép KD & Thông tin">
-                          <Eye className="w-4 h-4 inline" />
-                        </button>
-                        <button 
-                          onClick={() => handleApprove(com.id, com.name, 'company')}
-                          className="px-3 py-1.5 bg-emerald-50 text-emerald-600 hover:bg-emerald-600 hover:text-white rounded-lg font-semibold text-xs inline-flex items-center gap-1 transition-all"
-                        >
-                          <Check className="w-3.5 h-3.5" /> Xác minh
-                        </button>
-                        <button 
-                          onClick={() => handleReject(com.id, com.name, 'company')}
-                          className="px-3 py-1.5 bg-red-50 text-red-600 hover:bg-red-600 hover:text-white rounded-lg font-semibold text-xs inline-flex items-center gap-1 transition-all"
-                        >
-                          <X className="w-3.5 h-3.5" /> Từ chối
-                        </button>
-                      </td>
-                    </tr>
+                {pendingCompanies.map((com) => (
+                  <tr key={com.id} className="hover:bg-slate-50/80 transition-colors">
+                    <td className="px-6 py-4">
+                      <div className="font-semibold text-slate-800">{com.company_name}</div>
+                      <a href={com.website} target="_blank" rel="noreferrer" className="text-xs text-blue-500 hover:underline mt-0.5 block">{com.website}</a>
+                    </td>
+                    <td className="px-6 py-4 font-mono text-slate-600 font-medium">{com.tax_code || com.taxCode}</td>
+                    <td className="px-6 py-4 text-slate-600">{com.size || 'N/A'}</td>
+                    <td className="px-6 py-4 text-slate-500 flex items-center gap-1.5 pt-6">
+                      <Calendar className="w-3.5 h-3.5 text-slate-400" /> {com.created_at ? com.created_at.substring(0, 10) : 'N/A'}
+                    </td>
+                    <td className="px-6 py-4 text-right space-x-2">
+                      <button className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg" title="Xem giấy phép">
+                        <Eye className="w-4 h-4 inline" />
+                      </button>
+                      <button 
+                        onClick={() => handleApprove(com.id, com.company_name, 'company')}
+                        className="px-3 py-1.5 bg-emerald-50 text-emerald-600 hover:bg-emerald-600 hover:text-white rounded-lg font-semibold text-xs inline-flex items-center gap-1 transition-all"
+                      >
+                        <Check className="w-3.5 h-3.5" /> Xác minh
+                      </button>
+                      <button 
+                        onClick={() => handleReject(com.id, com.company_name, 'company')}
+                        className="px-3 py-1.5 bg-red-50 text-red-600 hover:bg-red-600 hover:text-white rounded-lg font-semibold text-xs inline-flex items-center gap-1 transition-all"
+                      >
+                        <X className="w-3.5 h-3.5" /> Từ chối
+                      </button>
+                    </td>
+                  </tr>
                 ))}
-                {pendingCompanies.length === 0 && (
+                {pendingCompanies.length === 0 && !loading && (
                   <tr>
                     <td colSpan="5" className="px-6 py-12 text-center text-slate-400">Không có doanh nghiệp nào chờ xác minh.</td>
                   </tr>
