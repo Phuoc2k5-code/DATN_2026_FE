@@ -12,7 +12,12 @@ export default function EmployerPage() {
     const [jobs, setJobs] = useState([]);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState(null);
-    const [activeTab, setActiveTab] = useState("jobs");
+    const [activeTab, setActiveTab] = useState(() => {
+        return localStorage.getItem("activeTab") || "statistics";
+    });
+    useEffect(() => {
+        localStorage.setItem("activeTab", activeTab);
+    }, [activeTab]);
     const [selectedJob, setSelectedJob] = useState(null);
     const [extendingJob, setExtendingJob] = useState(null);
     const [newDeadline, setNewDeadline] = useState("");
@@ -21,6 +26,8 @@ export default function EmployerPage() {
     const [categoriesList, setCategoriesList] = useState([]);
     const [isEditModalOpen, setIsEditModalOpen] = useState(false);
     const [editingJob, setEditingJob] = useState(null);
+    const [candidates, setCandidates] = useState([]);
+    const [skills, setSkills] = useState([]);
 
     const [newJob, setNewJob] = useState({
         title: "", category_id: 1, level: "Nhân viên",
@@ -223,7 +230,55 @@ export default function EmployerPage() {
     const filteredJobs = jobs.filter((job) =>
         job.title.toLowerCase().includes(searchQuery.toLowerCase())
     );
+    const loadCandidates = async () => {
+        try {
+            const token = localStorage.getItem("token");
+            const response = await axios.get("http://127.0.0.1:8000/api/employer/candidates", {
+                headers: { Authorization: `Bearer ${token}` }
+            });
 
+            if (response.data.success) {
+                setCandidates(response.data.data);
+            }
+        } catch (error) {
+            console.error("Lỗi khi tải danh sách ứng viên:", error);
+        }
+    };
+    const handleStatusChange = async (applicationId, newStatus) => {
+        try {
+            const token = localStorage.getItem('token');
+            // Gọi API cập nhật trạng thái
+            await axios.put(`http://127.0.0.1:8000/api/applications/${applicationId}/status`,
+                { status: newStatus },
+                { headers: { Authorization: `Bearer ${token}` } }
+            );
+
+            alert('Cập nhật trạng thái và gửi email thành công!');
+
+            // Cập nhật lại state danh sách ứng viên để giao diện đổi luôn mà không cần F5
+            setCandidates(prevCandidates =>
+                prevCandidates.map(candidate =>
+                    candidate.id === applicationId
+                        ? { ...candidate, status: newStatus }
+                        : candidate
+                )
+            );
+
+        } catch (error) {
+            console.error('Lỗi khi cập nhật:', error);
+            alert('Có lỗi xảy ra, vui lòng kiểm tra lại!');
+        }
+    };
+
+    useEffect(() => {
+        // Chỉ gọi API khi người dùng đang ở tab "Ứng viên"
+        if (activeTab === "candidates") {
+            loadCandidates();
+        }
+
+        // Tuyệt đối KHÔNG dùng setInterval ở đây nữa nhé!
+
+    }, [activeTab]);
     useEffect(() => {
         const fetchCompanyHeader = async () => {
             try {
@@ -242,14 +297,6 @@ export default function EmployerPage() {
         fetchCompanyHeader();
     }, []);
 
-    // 2. Danh sách Ứng Viên Tuyển Dụng Real-time
-    const [candidates, setCandidates] = useState([
-        { id: 101, name: "Lê Nguyễn Trọng Phúc", jobTitle: "Senior ReactJS Engineer", email: "phuc.ln@gmail.com", exp: 3, education: "Đại học", skills: ["React", "Tailwind", "JavaScript"], status: "Chờ duyệt", timeApplied: "Vừa xong" },
-        { id: 102, name: "Trần Toàn Phước", jobTitle: "Fullstack Node & React Developer", email: "phuoc.tt@gmail.com", exp: 2, education: "Cao đẳng", skills: ["NodeJS", "ReactJS", "Express"], status: "Phỏng vấn", timeApplied: "10 phút trước" },
-        { id: 103, name: "Nguyễn Văn Hùng", jobTitle: "Senior ReactJS Engineer", email: "hung.nv@yahoo.com", exp: 5, education: "Đại học", skills: ["React", "TypeScript", "Redux"], status: "Nhận việc", timeApplied: "2 giờ trước" },
-        { id: 104, name: "Phạm Thị Mai", jobTitle: "UI/UX Designer (Figma expert)", email: "maipham@gmail.com", exp: 1, education: "Trung cấp", skills: ["Figma", "Photoshop"], status: "Từ chối", timeApplied: "1 ngày trước" },
-        { id: 105, name: "Hoàng Anh Tuấn", jobTitle: "Digital Marketing Specialist", email: "tuan.ha@outlook.com", exp: 4, education: "Đại học", skills: ["SEO", "Content"], status: "Chờ duyệt", timeApplied: "2 ngày trước" },
-    ]);
 
     // Bộ lọc ứng viên nâng cao
     const [filterSkill, setFilterSkill] = useState("Tất cả");
@@ -264,18 +311,6 @@ export default function EmployerPage() {
 
     const [emailDetails, setEmailDetails] = useState({ time: "09:00", date: "", location: "65 Huỳnh Thúc Kháng, Q.1, TP.HCM", note: "" });
 
-
-    // XỬ LÝ TRẠNG THÁI CV & ĐIỀU HƯỚNG EMAIL TỰ ĐỘNG
-    const initiateStatusChange = (candidate, targetStatus) => {
-        setSelectedCandidate(candidate);
-        setNewStatusTarget(targetStatus);
-        // Chuẩn bị sẵn ngày mặc định cho email hẹn phỏng vấn
-        const tomorrow = new Date();
-        tomorrow.setDate(tomorrow.getDate() + 2);
-        setEmailDetails({ ...emailDetails, date: tomorrow.toISOString().split('T')[0] });
-        setShowEmailModal(true);
-    };
-
     const confirmStatusAndSendEmail = () => {
         // Cập nhật trạng thái ứng viên
         setCandidates(candidates.map(c => {
@@ -288,15 +323,25 @@ export default function EmployerPage() {
         alert(`Hệ thống đã kích hoạt và gửi email thông báo trạng thái [${newStatusTarget}] tự động đến ứng viên ${selectedCandidate.name}!`);
     };
 
-    // SÀNG LỌC ỨNG VIÊN THEO TIÊU CHÍ NÂNG CAO
+    // SÀNG LỌC ỨNG VIÊN THEO TIÊU CHÍ NÂNG CAO\
+
+
     const filteredCandidates = candidates.filter(c => {
-        const matchSkill = filterSkill === "Tất cả" || c.skills.includes(filterSkill);
+        // 1. BỎ QUA việc lọc kỹ năng ở đây (vì API đã lọc sẵn rồi)
+        // const matchSkill = filterSkill === "Tất cả" || c.skills.includes(filterSkill); 
+
+        // 2. Chỉ giữ lại lọc Edu và Exp
         const matchEdu = filterEdu === "Tất cả" || c.education === filterEdu;
+
         let matchExp = true;
-        if (filterExp === "fresher") matchExp = c.exp < 2;
-        if (filterExp === "junior") matchExp = c.exp >= 2 && c.exp <= 4;
-        if (filterExp === "senior") matchExp = c.exp > 4;
-        return matchSkill && matchEdu && matchExp;
+        // Đảm bảo c.exp là số để so sánh (Phòng trường hợp API trả về chuỗi)
+        const expValue = parseInt(c.exp) || 0;
+
+        if (filterExp === "fresher") matchExp = expValue < 2;
+        else if (filterExp === "junior") matchExp = expValue >= 2 && expValue <= 4;
+        else if (filterExp === "senior") matchExp = expValue > 4;
+
+        return matchEdu && matchExp;
     });
     const fetchCompanyJobs = async () => {
         setLoading(true);
@@ -316,6 +361,42 @@ export default function EmployerPage() {
         }
 
     };
+    // Gọi API lấy toàn bộ kỹ năng khi component được render lần đầu
+    useEffect(() => {
+        axios.get('http://127.0.0.1:8000/api/skills') // Thay bằng URL API thực tế của bạn
+            .then(res => {
+                setSkills(res.data);
+            })
+            .catch(err => console.error("Lỗi lấy danh sách kỹ năng:", err));
+    }, []);
+    const fetchCandidates = () => {
+        // 1. Lấy token để gọi API bảo mật
+        const token = localStorage.getItem('token');
+
+        // 2. Xây dựng đường dẫn API kèm theo tham số tìm kiếm (id của skill)
+        let url = 'http://127.0.0.1:8000/api/employer/candidates?';
+
+        // Nếu filterSkill khác "Tất cả", tức là nó đang chứa ID của kỹ năng (VD: 1, 2, 3...)
+        if (filterSkill !== 'Tất cả') {
+            url += `skill=${filterSkill}&`;
+        }
+        // Gắn thêm các bộ lọc khác nếu có (VD: url += `exp=${filterExp}`)
+
+        // 3. Gửi request
+        axios.get(url, {
+            headers: { 'Authorization': `Bearer ${token}` }
+        })
+            .then(res => {
+                setCandidates(res.data?.data || []);
+            })
+            .catch(err => console.error("Lỗi khi lọc ứng viên:", err));
+    };
+
+    // Sử dụng useEffect để tự động chạy hàm fetchCandidates MỖI KHI giá trị filterSkill thay đổi
+    useEffect(() => {
+        fetchCandidates();
+
+    }, [filterSkill]);
 
     return (
         <div className="w-full min-h-screen bg-[#FFFDF9] font-sans text-slate-800 antialiased flex">
@@ -360,9 +441,6 @@ export default function EmployerPage() {
                                 }`}
                         >
                             <Users size={16} /> Hồ sơ ứng viên
-                            <span className="ml-auto bg-rose-500 text-white text-[10px] font-black h-5 px-1.5 min-w-5 flex items-center justify-center rounded-full animate-pulse">
-                                2
-                            </span>
                         </button>
                     </nav>
                 </div>
@@ -683,14 +761,17 @@ export default function EmployerPage() {
                                 <label className="text-[9px] font-black text-slate-400 uppercase block mb-1">Kỹ năng bắt buộc</label>
                                 <select
                                     value={filterSkill}
+                                    // Lưu ý: Giá trị lưu bây giờ sẽ là ID của kỹ năng (hoặc "Tất cả")
                                     onChange={(e) => setFilterSkill(e.target.value)}
                                     className="w-full text-[11px] text-slate-600 border border-slate-200 rounded-lg px-2 py-1.5 bg-slate-50 outline-none focus:border-orange-400 cursor-pointer"
                                 >
                                     <option value="Tất cả">Tất cả kỹ năng</option>
-                                    <option value="React">React / ReactJS</option>
-                                    <option value="NodeJS">NodeJS</option>
-                                    <option value="Figma">Figma</option>
-                                    <option value="SEO">SEO</option>
+                                    {/* Duyệt qua mảng skills lấy từ database */}
+                                    {skills.map((skill) => (
+                                        <option key={skill.id} value={skill.id}>
+                                            {skill.name}
+                                        </option>
+                                    ))}
                                 </select>
                             </div>
 
@@ -741,9 +822,6 @@ export default function EmployerPage() {
                                 <h2 className="text-[11px] font-black uppercase text-slate-400 tracking-wider">
                                     Hồ sơ tìm thấy ({filteredCandidates.length})
                                 </h2>
-                                <div className="text-[10px] text-emerald-600 font-bold flex items-center gap-1 animate-pulse">
-                                    <span className="w-2 h-2 rounded-full bg-emerald-500"></span> Live stream CV kết nối thời gian thực
-                                </div>
                             </div>
 
                             {filteredCandidates.length === 0 ? (
@@ -775,7 +853,24 @@ export default function EmployerPage() {
                                             <p className="text-xs text-slate-500 font-medium flex items-center gap-1">
                                                 Ứng tuyển vị trí: <strong className="text-slate-700 font-semibold">{candidate.jobTitle}</strong>
                                             </p>
-
+                                            <div className="flex items-center gap-3 py-1.5 w-full sm:w-2/3">
+                                                <span className="text-[10px] font-bold text-slate-500 whitespace-nowrap">Độ phù hợp:</span>
+                                                <div className="flex-1 h-2 bg-slate-100 rounded-full overflow-hidden flex items-center">
+                                                    <div
+                                                        className={`h-full rounded-full transition-all duration-1000 ${candidate.matchScore >= 80 ? 'bg-emerald-500' :
+                                                            candidate.matchScore >= 60 ? 'bg-amber-400' :
+                                                                'bg-rose-400'
+                                                            }`}
+                                                        style={{ width: `${candidate.matchScore || 0}%` }}
+                                                    ></div>
+                                                </div>
+                                                <span className={`text-xs font-black ${candidate.matchScore >= 80 ? 'text-emerald-600' :
+                                                    candidate.matchScore >= 60 ? 'text-amber-600' :
+                                                        'text-rose-500'
+                                                    }`}>
+                                                    {candidate.matchScore}%
+                                                </span>
+                                            </div>
                                             <div className="flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-slate-400 pt-1">
                                                 <span className="flex items-center gap-0.5 text-slate-500"><Award size={12} /> {candidate.exp} năm kinh nghiệm</span>
                                                 <span className="flex items-center gap-0.5 text-slate-500"><MapPin size={12} /> Học vấn: {candidate.education}</span>
@@ -797,19 +892,45 @@ export default function EmployerPage() {
                                             <div className="relative w-full sm:w-auto">
                                                 <select
                                                     value={candidate.status}
-                                                    onChange={(e) => initiateStatusChange(candidate, e.target.value)}
-                                                    className="w-full sm:w-36 text-[11px] font-bold text-slate-700 bg-white border border-slate-200 rounded-lg px-2.5 py-1.5 outline-none cursor-pointer focus:border-orange-400 appearance-none pr-8"
-                                                >
-                                                    <option value="Chờ duyệt">Chờ duyệt</option>
-                                                    <option value="Phỏng vấn">Phỏng vấn</option>
-                                                    <option value="Từ chối">Từ chối</option>
-                                                    <option value="Nhận việc">Nhận việc</option>
+                                                    onChange={(e) => handleStatusChange(candidate.id, e.target.value)}
+                                                    className={`w-full sm:w-36 px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-wider cursor-pointer outline-none text-center transition-colors
+                                                    ${candidate.status === "Chờ duyệt" ? "bg-amber-100 text-amber-800 hover:bg-amber-200" :
+                                                            candidate.status === "Phỏng vấn" ? "bg-blue-100 text-blue-800 hover:bg-blue-200" :
+                                                                candidate.status === "Nhận việc" ? "bg-emerald-100 text-emerald-800 hover:bg-emerald-200" :
+                                                                    "bg-rose-100 text-rose-800 hover:bg-rose-200"}`}>
+                                                    <option value="Chờ duyệt">CHỜ DUYỆT</option>
+                                                    <option value="Phỏng vấn">PHỎNG VẤN</option>
+                                                    <option value="Nhận việc">NHẬN VIỆC</option>
+                                                    <option value="Từ chối">TỪ CHỐI</option>
                                                 </select>
-                                                <ChevronDown size={12} className="text-slate-400 absolute right-2 top-2 pointer-events-none" />
                                             </div>
 
-                                            <button className="text-[10px] font-bold text-blue-600 bg-blue-50 hover:bg-blue-100 px-3 py-1.5 rounded-lg w-full sm:w-36 text-center transition-colors">
-                                                Xem trực tuyến CV
+                                            <button
+                                                onClick={() => {
+                                                    if (candidate.file_path) {
+                                                        // 1. Lấy đường dẫn gốc từ Database
+                                                        let cleanPath = candidate.file_path;
+
+                                                        // 2. Tự động cắt bỏ cái đuôi ổ cứng "F:/.../public/" đi
+                                                        // Nó sẽ biến "F:/DATN/.../public/cv_files/abc.pdf" thành "cv_files/abc.pdf"
+                                                        if (cleanPath.includes('public/')) {
+                                                            cleanPath = cleanPath.split('public/')[1];
+                                                        } else if (cleanPath.includes('public\\')) { // Đề phòng dấu gạch chéo ngược của Windows
+                                                            cleanPath = cleanPath.split('public\\')[1];
+                                                        }
+
+                                                        // 3. Ghép vào domain của web (Bắt buộc phải có 127.0.0.1:8000 thì Laravel mới nhả file ra)
+                                                        const fileUrl = `http://127.0.0.1:8000/${cleanPath}`;
+
+                                                        // Mở file
+                                                        window.open(fileUrl, '_blank');
+                                                    } else {
+                                                        alert("Ứng viên này chưa cập nhật file CV!");
+                                                    }
+                                                }}
+                                                className="text-[10px] font-bold text-blue-600 bg-blue-50 hover:bg-blue-100 px-3 py-1.5 rounded-lg w-full sm:w-36 text-center transition-colors"
+                                            >
+                                                Xem trực tiếp CV
                                             </button>
                                         </div>
 
@@ -1038,15 +1159,13 @@ export default function EmployerPage() {
                                 <button
                                     type="button"
                                     onClick={() => setShowEmailModal(false)}
-                                    className="px-4 py-2 bg-slate-100 hover:bg-slate-200 font-bold rounded-lg"
-                                >
+                                    className="px-4 py-2 bg-slate-100 hover:bg-slate-200 font-bold rounded-lg">
                                     Đóng lại
                                 </button>
                                 <button
                                     type="button"
                                     onClick={confirmStatusAndSendEmail}
-                                    className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-lg shadow-sm flex items-center gap-1"
-                                >
+                                    className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-lg shadow-sm flex items-center gap-1">
                                     <Send size={12} /> Phê duyệt & Gửi Email ngay
                                 </button>
                             </div>
