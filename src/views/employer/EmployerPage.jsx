@@ -28,6 +28,37 @@ export default function EmployerPage() {
     const [editingJob, setEditingJob] = useState(null);
     const [candidates, setCandidates] = useState([]);
     const [skills, setSkills] = useState([]);
+    const [weekOffset, setWeekOffset] = useState(0);
+    const [dashboardStats, setDashboardStats] = useState({
+        activeJobs: 0,
+        totalJobs: 0,
+        totalCVs: 0,
+        totalViews: 0,
+        interviewRate: 0,
+        weeklyViewsChart: [],
+        cvChartData: []
+    });
+    useEffect(() => {
+        if (activeTab === "dashboard") {
+            const fetchStats = async () => {
+                try {
+                    const token = localStorage.getItem('token');
+                    // SỬA QUAN TRỌNG NHẤT Ở ĐÂY: Dùng dấu backtick (`) và gắn ?week_offset=${weekOffset} vào cuối link
+                    const response = await axios.get(`http://127.0.0.1:8000/api/employer/dashboard-stats?week_offset=${weekOffset}`, {
+                        headers: { 'Authorization': `Bearer ${token}` }
+                    });
+
+                    if (response.data.success) {
+                        setDashboardStats(response.data.data);
+                    }
+                } catch (error) {
+                    console.error("Lỗi khi tải thông số Dashboard:", error);
+                }
+            };
+
+            fetchStats();
+        }
+    }, [activeTab, weekOffset]);
 
     const [newJob, setNewJob] = useState({
         title: "", category_id: 1, level: "Nhân viên",
@@ -397,6 +428,27 @@ export default function EmployerPage() {
         fetchCandidates();
 
     }, [filterSkill]);
+    useEffect(() => {
+        // Chỉ gọi API khi tab đang mở là 'dashboard'
+        if (activeTab === "dashboard") {
+            const fetchStats = async () => {
+                try {
+                    const token = localStorage.getItem('token');
+                    const response = await axios.get('http://127.0.0.1:8000/api/employer/dashboard-stats', {
+                        headers: { 'Authorization': `Bearer ${token}` }
+                    });
+
+                    if (response.data.success) {
+                        setDashboardStats(response.data.data); // Lưu dữ liệu vào State
+                    }
+                } catch (error) {
+                    console.error("Lỗi khi tải thông số Dashboard:", error);
+                }
+            };
+
+            fetchStats();
+        }
+    }, [activeTab]); // React sẽ tự động gọi lại hàm này nếu bạn bấm chuyển sang tab dashboard
 
     return (
         <div className="w-full min-h-screen bg-[#FFFDF9] font-sans text-slate-800 antialiased flex">
@@ -504,28 +556,36 @@ export default function EmployerPage() {
                                 <div className="w-10 h-10 rounded-xl bg-orange-50 flex items-center justify-center text-orange-500"><Briefcase size={20} /></div>
                                 <div>
                                     <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Tin Đang Chạy</p>
-                                    <h3 className="text-xl font-black text-slate-900 mt-0.5">3 / 4</h3>
+                                    <h3 className="text-xl font-black text-slate-900 mt-0.5">
+                                        {dashboardStats.activeJobs} / {dashboardStats.totalJobs}
+                                    </h3>
                                 </div>
                             </div>
                             <div className="bg-white border border-slate-200/80 rounded-2xl p-4 shadow-sm flex items-center gap-4">
                                 <div className="w-10 h-10 rounded-xl bg-blue-50 flex items-center justify-center text-blue-500"><Users size={20} /></div>
                                 <div>
                                     <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Tổng CV Đã Tiếp Nhận</p>
-                                    <h3 className="text-xl font-black text-slate-900 mt-0.5">80 Hồ sơ</h3>
+                                    <h3 className="text-xl font-black text-slate-900 mt-0.5">
+                                        {dashboardStats.totalCVs} Hồ sơ
+                                    </h3>
                                 </div>
                             </div>
                             <div className="bg-white border border-slate-200/80 rounded-2xl p-4 shadow-sm flex items-center gap-4">
                                 <div className="w-10 h-10 rounded-xl bg-emerald-50 flex items-center justify-center text-emerald-500"><TrendingUp size={20} /></div>
                                 <div>
                                     <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Lượt Tiếp Cận Tin</p>
-                                    <h3 className="text-xl font-black text-slate-900 mt-0.5">5,010 Lượt</h3>
+                                    <h3 className="text-xl font-black text-slate-900 mt-0.5">
+                                        {dashboardStats.totalViews.toLocaleString('vi-VN')} Lượt
+                                    </h3>
                                 </div>
                             </div>
                             <div className="bg-white border border-slate-200/80 rounded-2xl p-4 shadow-sm flex items-center gap-4">
                                 <div className="w-10 h-10 rounded-xl bg-purple-50 flex items-center justify-center text-purple-500"><Mail size={20} /></div>
                                 <div>
                                     <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Tỷ Lệ Mời Phỏng Vấn</p>
-                                    <h3 className="text-xl font-black text-slate-900 mt-0.5">38.5%</h3>
+                                    <h3 className="text-xl font-black text-slate-900 mt-0.5">
+                                        {dashboardStats.interviewRate}%
+                                    </h3>
                                 </div>
                             </div>
                         </div>
@@ -534,53 +594,87 @@ export default function EmployerPage() {
                         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                             {/* Biểu đồ lượt tiếp cận */}
                             <div className="bg-white border border-slate-200/80 rounded-2xl p-5 shadow-sm">
-                                <div className="flex justify-between items-center mb-4">
-                                    <h3 className="text-xs font-bold text-slate-700 uppercase tracking-wider flex items-center gap-1">
-                                        <BarChart3 size={14} className="text-orange-500" /> Biểu đồ lượt tiếp cận tin đăng (Tuần này)
+                                <div className="flex justify-between items-center mb-4 gap-2">
+                                    <h3 className="text-xs font-bold text-slate-700 uppercase tracking-wider flex items-center gap-1 whitespace-nowrap">
+                                        <BarChart3 size={14} className="text-orange-500" /> Biểu đồ lượt tiếp cận tin đăng
                                     </h3>
-                                    <span className="text-[10px] text-slate-400 font-medium">Cập nhật: 5 phút trước</span>
+
+                                    {/* BỘ CHỌN PHẠM VI 1 THÁNG MỚI NÂNG CẤP */}
+                                    <select
+                                        value={weekOffset}
+                                        onChange={(e) => setWeekOffset(Number(e.target.value))}
+                                        className="text-[10px] font-bold text-slate-500 bg-slate-50 border border-slate-200 rounded-lg px-2 py-1 outline-none cursor-pointer hover:border-slate-300 transition-all"
+                                    >
+                                        <option value={0}>Tuần này</option>
+                                        <option value={1}>Tuần trước</option>
+                                        <option value={2}>2 tuần trước</option>
+                                        <option value={3}>3 tuần trước</option>
+                                    </select>
                                 </div>
+
                                 {/* Thiết kế biểu đồ cột dạng Custom Tailwind thuần (Không lo lỗi thư viện) */}
                                 <div className="h-44 flex items-end justify-between gap-2 pt-6 pb-2 px-2">
-                                    <div className="w-full flex flex-col items-center gap-2">
-                                        <div className="w-full bg-orange-100 rounded-t-lg transition-all hover:bg-orange-500 h-16 relative group">
-                                            <span className="absolute -top-6 left-1/2 -translate-x-1/2 bg-slate-900 text-white font-mono text-[9px] px-1 rounded opacity-0 group-hover:opacity-100 transition-opacity">420</span>
-                                        </div>
-                                        <span className="text-[9px] font-bold text-slate-400">Thứ 2</span>
-                                    </div>
-                                    <div className="w-full flex flex-col items-center gap-2">
-                                        <div className="w-full bg-orange-100 rounded-t-lg transition-all hover:bg-orange-500 h-24 relative group">
-                                            <span className="absolute -top-6 left-1/2 -translate-x-1/2 bg-slate-900 text-white font-mono text-[9px] px-1 rounded opacity-0 group-hover:opacity-100 transition-opacity">680</span>
-                                        </div>
-                                        <span className="text-[9px] font-bold text-slate-400">Thứ 3</span>
-                                    </div>
-                                    <div className="w-full flex flex-col items-center gap-2">
-                                        <div className="w-full bg-orange-500 rounded-t-lg h-36 relative group">
-                                            <span className="absolute -top-6 left-1/2 -translate-x-1/2 bg-slate-900 text-white font-mono text-[9px] px-1 rounded opacity-100">1240</span>
-                                        </div>
-                                        <span className="text-[9px] font-bold text-slate-700">Thứ 4</span>
-                                    </div>
-                                    <div className="w-full flex flex-col items-center gap-2">
-                                        <div className="w-full bg-orange-100 rounded-t-lg transition-all hover:bg-orange-500 h-28 relative group">
-                                            <span className="absolute -top-6 left-1/2 -translate-x-1/2 bg-slate-900 text-white font-mono text-[9px] px-1 rounded opacity-0 group-hover:opacity-100 transition-opacity">890</span>
-                                        </div>
-                                        <span className="text-[9px] font-bold text-slate-400">Thứ 5</span>
-                                    </div>
-                                    <div className="w-full flex flex-col items-center gap-2">
-                                        <div className="w-full bg-orange-100 rounded-t-lg transition-all hover:bg-orange-500 h-32 relative group">
-                                            <span className="absolute -top-6 left-1/2 -translate-x-1/2 bg-slate-900 text-white font-mono text-[9px] px-1 rounded opacity-0 group-hover:opacity-100 transition-opacity">1020</span>
-                                        </div>
-                                        <span className="text-[9px] font-bold text-slate-400">Thứ 6</span>
-                                    </div>
-                                    <div className="w-full flex flex-col items-center gap-2">
-                                        <div className="w-full bg-orange-100 rounded-t-lg transition-all hover:bg-orange-500 h-20 relative group">
-                                            <span className="absolute -top-6 left-1/2 -translate-x-1/2 bg-slate-900 text-white font-mono text-[9px] px-1 rounded opacity-0 group-hover:opacity-100 transition-opacity">510</span>
-                                        </div>
-                                        <span className="text-[9px] font-bold text-slate-400">Thứ 7</span>
-                                    </div>
+                                    {(() => {
+                                        // Bộ khung mặc định phòng trường hợp chưa có dữ liệu
+                                        const chartData = dashboardStats.weeklyViewsChart && dashboardStats.weeklyViewsChart.length > 0
+                                            ? dashboardStats.weeklyViewsChart
+                                            : [
+                                                { label: 'Thứ 2', clicks: 0, date_format: '' },
+                                                { label: 'Thứ 3', clicks: 0, date_format: '' },
+                                                { label: 'Thứ 4', clicks: 0, date_format: '' },
+                                                { label: 'Thứ 5', clicks: 0, date_format: '' },
+                                                { label: 'Thứ 6', clicks: 0, date_format: '' },
+                                                { label: 'Thứ 7', clicks: 0, date_format: '' },
+                                                { label: 'CN', clicks: 0, date_format: '' }
+                                            ];
+
+                                        // Tìm số lượt click cao nhất để tính cột cao nhất (mốc 100%)
+                                        const maxClicks = Math.max(...chartData.map(item => item.clicks));
+
+                                        // Xác định ngày hôm nay để highlight (Chỉ áp dụng khi đang xem tuần hiện tại offset = 0)
+                                        const daysMapping = ['CN', 'Thứ 2', 'Thứ 3', 'Thứ 4', 'Thứ 5', 'Thứ 6', 'Thứ 7'];
+                                        const todayLabel = daysMapping[new Date().getDay()];
+
+                                        return chartData.map((item, index) => {
+                                            // Tính phần trăm chiều cao cột, tối thiểu 12% để 0 click vẫn hiện vạch chân nền đẹp mắt
+                                            const heightPercent = maxClicks > 0 ? Math.max((item.clicks / maxClicks) * 100, 12) : 12;
+
+                                            // Chỉ highlight nếu là ngày hôm nay VÀ đang chọn xem tuần này
+                                            const isToday = weekOffset === 0 && item.label === todayLabel;
+
+                                            return (
+                                                <div key={index} className="w-full h-full flex flex-col items-center justify-end gap-1.5">
+                                                    <div
+                                                        className={`w-full rounded-t-lg relative group transition-all duration-300 ${isToday
+                                                            ? 'bg-orange-500'
+                                                            : 'bg-orange-100 hover:bg-orange-500'
+                                                            }`}
+                                                        style={{ height: `${heightPercent}%` }}
+                                                    >
+                                                        {/* Tooltip hiện số lượt click nguyên bản của bạn */}
+                                                        <span className={`absolute -top-6 left-1/2 -translate-x-1/2 bg-slate-900 text-white font-mono text-[9px] px-1 rounded pointer-events-none transition-opacity ${isToday ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
+                                                            }`}>
+                                                            {item.clicks}
+                                                        </span>
+                                                    </div>
+
+                                                    {/* Nhãn Thứ và Ngày tháng (Ví dụ: Thứ 2 - 15/06) */}
+                                                    <div className="flex flex-col items-center">
+                                                        <span className={`text-[9px] font-bold whitespace-nowrap ${isToday ? 'text-slate-700' : 'text-slate-400'}`}>
+                                                            {item.label}
+                                                        </span>
+                                                        {item.date_format && (
+                                                            <span className="text-[8px] text-slate-400/80 font-mono scale-90 -mt-0.5">
+                                                                {item.date_format}
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                            );
+                                        });
+                                    })()}
                                 </div>
                             </div>
-
                             {/* Biểu đồ số lượng hồ sơ nộp */}
                             <div className="bg-white border border-slate-200/80 rounded-2xl p-5 shadow-sm">
                                 <div className="flex justify-between items-center mb-4">
@@ -589,35 +683,60 @@ export default function EmployerPage() {
                                     </h3>
                                     <span className="text-[10px] text-slate-400 font-medium">Đơn vị: Hồ sơ</span>
                                 </div>
+
                                 <div className="h-44 flex items-end justify-between gap-4 pt-6 pb-2 px-4">
-                                    <div className="w-full flex flex-col items-center gap-1.5">
-                                        <div className="w-8 bg-blue-100 hover:bg-blue-600 transition-colors rounded-t h-12 text-center text-[10px] font-bold text-slate-700 pt-1">5</div>
-                                        <span className="text-[9px] font-medium text-slate-400">Tuần 1</span>
-                                    </div>
-                                    <div className="w-full flex flex-col items-center gap-1.5">
-                                        <div className="w-8 bg-blue-100 hover:bg-blue-600 transition-colors rounded-t h-20 text-center text-[10px] font-bold text-slate-700 pt-1">12</div>
-                                        <span className="text-[9px] font-medium text-slate-400">Tuần 2</span>
-                                    </div>
-                                    <div className="w-full flex flex-col items-center gap-1.5">
-                                        <div className="w-8 bg-blue-600 rounded-t h-36 text-center text-[10px] font-bold text-white pt-1">24</div>
-                                        <span className="text-[9px] font-bold text-slate-700">Tuần 3</span>
-                                    </div>
-                                    <div className="w-full flex flex-col items-center gap-1.5">
-                                        <div className="w-8 bg-blue-100 hover:bg-blue-600 transition-colors rounded-t h-24 text-center text-[10px] font-bold text-slate-700 pt-1">16</div>
-                                        <span className="text-[9px] font-medium text-slate-400">Tuần 4</span>
-                                    </div>
+                                    {(() => {
+                                        // Khung mặc định phòng trường hợp API chưa load xong dữ liệu
+                                        const chartData = dashboardStats.cvChartData && dashboardStats.cvChartData.length > 0
+                                            ? dashboardStats.cvChartData
+                                            : [
+                                                // Sửa lại 4 dòng này cho chuẩn format mới
+                                                { label: 'Tuần 1', cvs: 0, is_current: false, range: '' },
+                                                { label: 'Tuần 2', cvs: 0, is_current: false, range: '' },
+                                                { label: 'Tuần 3', cvs: 0, is_current: false, range: '' },
+                                                { label: 'Tuần 4', cvs: 0, is_current: false, range: '' }
+                                            ];
+
+                                        // Tìm số lượng CV lớn nhất để tính tỉ lệ cột cao nhất
+                                        const maxCvs = Math.max(...chartData.map(item => item.cvs));
+
+                                        return chartData.map((item, index) => {
+                                            // TỈ LỆ CHIỀU CAO: Cột cao nhất sẽ đạt 100%. 
+                                            // Nếu không có CV nào (bằng 0), giữ mức 16% để hiển thị được số 0 bọc trong cột màu xanh rất đẹp.
+                                            const heightPercent = maxCvs > 0 ? Math.max((item.cvs / maxCvs) * 100, 16) : 16;
+
+                                            return (
+                                                <div key={index} className="w-full h-full flex flex-col items-center justify-end gap-1.5 group">
+                                                    {/* Thanh cột hiển thị số lượng CV */}
+                                                    <div
+                                                        className={`w-8 rounded-t text-center text-[10px] font-bold pt-1 transition-all duration-300 relative flex justify-center ${item.is_current
+                                                            ? 'bg-blue-600 text-white'
+                                                            : 'bg-blue-100 hover:bg-blue-600 text-slate-700 hover:text-white'
+                                                            }`}
+                                                        style={{ height: `${heightPercent}%` }}
+                                                    >
+                                                        {/* Tooltip hiển thị khoảng ngày chi tiết khi hover chuột vào cột */}
+                                                        {item.range && (
+                                                            <span className="absolute -top-7 bg-slate-800 text-white text-[9px] px-1.5 py-0.5 rounded opacity-0 group-hover:opacity-100 whitespace-nowrap pointer-events-none transition-opacity z-10 shadow">
+                                                                {item.range}
+                                                            </span>
+                                                        )}
+
+                                                        {/* Hiển thị số lượng CV thực tế */}
+                                                        {item.cvs}
+                                                    </div>
+
+                                                    {/* Nhãn Tuần ở dưới đáy */}
+                                                    <span className={`text-[9px] whitespace-nowrap ${item.is_current ? 'font-bold text-slate-700' : 'font-medium text-slate-400'
+                                                        }`}>
+                                                        {item.label}
+                                                    </span>
+                                                </div>
+                                            );
+                                        });
+                                    })()}
                                 </div>
                             </div>
-                        </div>
-
-                        {/* Hoạt động tuyển dụng gần đây */}
-                        <div className="bg-[#FBF4DC] rounded-2xl border border-amber-200/60 p-5">
-                            <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wider flex items-center gap-1">
-                                <Sparkles size={13} className="text-amber-600" /> Đánh giá hiệu suất từ Trợ lý thông minh SmartJob AI
-                            </h3>
-                            <p className="text-xs text-slate-700 leading-relaxed mt-2">
-                                Tin đăng <span className="font-bold">"Fullstack Node & React Developer"</span> đang đạt hiệu suất khớp mã (Matching Score) rất cao với nhóm sinh viên K23 Công nghệ thông tin trường Cao Thắng. Đã có <span className="font-bold text-blue-600">24 CV ứng tuyển</span> trong vòng 48h qua, phân phối điểm hồ sơ tập trung ở mức 85/100 điểm kỹ năng cốt lõi. Hãy tiến hành lọc hồ sơ ngay!
-                            </p>
                         </div>
                     </div>
                 )}
