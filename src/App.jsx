@@ -4,6 +4,9 @@ import viteLogo from './assets/vite.svg'
 import heroImg from './assets/hero.png'
 import './App.css'
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
+
+import RegisterPage from './views/auth/Register'
+import ForgotPasswordPage from './views/auth/ForgotPassword'
 // candidate
 import Layout from './layouts/layout_user/Layout';
 import LoginPage from './views/auth/LoginPage';
@@ -32,6 +35,7 @@ import SystemModeration from './views/admin/SystemModeration';
 // employer
 import EmployerPage from './views/employer/EmployerPage';
 import EmployerProfile from './views/employer/EmployerProfile';
+import CreateCompanyPage from './views/employer/CreateCompanyPage'
 
 function App() {
   return (
@@ -39,6 +43,9 @@ function App() {
       <BrowserRouter>
         <Routes>          
           <Route path="/login" element={<LoginPage />} />
+          <Route path='/register' element={<RegisterPage/>}/>
+          <Route path='/forgot-password' element={<ForgotPasswordPage/>} />
+          <Route path='/create-company' element={<CreateCompanyPage/>} />
           <Route element={<Layout />}>
             <Route path="/" element={<HomePage />} />
             <Route path="/jobs/:id" element={<JobDetail />} />

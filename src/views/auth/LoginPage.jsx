@@ -134,7 +134,7 @@ export default function LoginPage() {
               <div className="space-y-1">
                 <div className="flex items-center justify-between">
                   <label htmlFor="password" className="block text-xs font-semibold text-slate-600">Mật khẩu</label>
-                  <a href="#" className="text-xs font-semibold text-blue-600 hover:text-blue-700 transition">Quên mật khẩu?</a>
+                  <a href="/forgot-password" className="text-xs font-semibold text-blue-600 hover:text-blue-700 transition">Quên mật khẩu?</a>
                 </div>
                 <div className="flex items-center gap-2 px-3 py-2.5 border border-slate-200 rounded-xl bg-slate-50/50 focus-within:bg-white focus-within:border-blue-500 focus-within:ring-4 focus-within:ring-blue-500/10 transition duration-200">
                   <Lock size={16} className="text-slate-400" />
@@ -172,7 +172,7 @@ export default function LoginPage() {
             {/* Chuyển hướng đăng ký hồ sơ */}
             <div className="mt-8 text-center text-xs text-slate-500">
               Bạn chưa có tài khoản thành viên?{' '}
-              <a href="#" className="font-bold text-blue-600 hover:text-blue-700 hover:underline transition">
+              <a href="/register" className="font-bold text-blue-600 hover:text-blue-700 hover:underline transition">
                 Đăng ký ngay
               </a>
             </div>
