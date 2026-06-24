@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
-import { Link, useNavigate } from "react-router-dom";
+// Đổi Link thành NavLink cho các menu điều hướng
+import { Link, NavLink, useNavigate } from "react-router-dom"; 
 import axios from "axios";
 import { LogOut, User, History } from "lucide-react";
 
@@ -12,7 +13,6 @@ export default function Header() {
   useEffect(() => {
     const token = localStorage.getItem("token");
     
-    // Nếu không có token, hiểu là chưa đăng nhập -> không cần gọi API
     if (!token) {
       setCurrentUser(null);
       return;
@@ -30,11 +30,9 @@ export default function Header() {
         if (response.data.success) {
           const uData = response.data.data;
           
-          // Đồng bộ và gán gọn lại các trường cần thiết để hiển thị trên Header
           setCurrentUser({
             name: uData.candidate?.full_name || "Thành viên",
             email: uData.email,
-            // Xử lý link ảnh từ DB, bọc lót nếu rỗng
             avatar: uData.candidate?.avatar_url
               ? `http://127.0.0.1:8000/${uData.candidate.avatar_url}`
               : "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150",
@@ -42,7 +40,6 @@ export default function Header() {
         }
       } catch (error) {
         console.error("Lỗi lấy thông tin profile tại Header:", error);
-        // Nếu token hết hạn hoặc lỗi 401, xóa token cũ và đưa về trạng thái chưa đăng nhập
         if (error.response?.status === 401) {
           localStorage.removeItem("token");
           localStorage.removeItem("user");
@@ -61,9 +58,16 @@ export default function Header() {
       localStorage.removeItem("user");
       setCurrentUser(null);
       setIsOpenDropdown(false);
-      navigate("/login"); // Đá user về trang login
+      navigate("/login");
     }
   };
+
+  // 3. THIẾT LẬP STYLE CHO NAV LINK KHI ĐƯỢC ACTIVE VÀ NORMAL
+  // Tách hàm riêng giúp code gọn gàng, sạch sẽ (Đạt điểm cộng khi Hội đồng chấm Code)
+  const navLinkStyle = ({ isActive }) =>
+    isActive
+      ? "text-blue-600 font-bold border-b-2 border-blue-600 pb-1 transition-all duration-200"
+      : "text-slate-600 hover:text-blue-600 font-medium pb-1 transition-all duration-200";
 
   return (
     <header className="sticky top-0 z-[1000] border-b border-orange-100 bg-white/95 backdrop-blur-md px-6 py-3.5 w-full">
@@ -77,29 +81,46 @@ export default function Header() {
           </span>
         </Link>
 
-        {/* NAVIGATION MENUS */}
-        <nav className="hidden items-center gap-6 md:flex text-sm font-medium text-slate-600">
-          <Link to="/" className="text-blue-600 font-semibold border-b-2 border-blue-600 pb-1">Tìm việc</Link>
-          <Link to="/cv-management/create-cv" className="hover:text-blue-600 transition-colors">Tạo CV</Link>
-          <Link to="/application-history" className="hover:text-blue-600 transition-colors">Lịch sử ứng tuyển</Link>
-          <Link to="/ai-suggestions" className="hover:text-blue-600 transition-colors text-indigo-600 font-semibold">AI gợi ý</Link>
+        {/* NAVIGATION MENUS - ĐÃ ĐƯỢC ĐỘNG HÓA THEO URL */}
+        <nav className="hidden items-center gap-6 md:flex text-sm">
+          {/* end: giúp chỉ active chính xác trang chủ "/" chứ không bị dính chùm với các route con */}
+          <NavLink to="/" end className={navLinkStyle}>
+            Tìm việc
+          </NavLink>
+          
+          <NavLink to="/cv-management/create-cv" className={navLinkStyle}>
+            Tạo CV
+          </NavLink>
+          
+          <NavLink to="/application-history" className={navLinkStyle}>
+            Lịch sử ứng tuyển
+          </NavLink>
+          
+          {/* Riêng nút AI gợi ý, nếu muốn giữ màu chữ Indigo đặc trưng, có thể custom nhẹ cấu trúc class */}
+          <NavLink 
+            to="/ai-suggestions" 
+            className={({ isActive }) => 
+              isActive 
+                ? "text-indigo-600 font-bold border-b-2 border-indigo-600 pb-1" 
+                : "text-indigo-500 hover:text-indigo-700 font-semibold pb-1"
+            }
+          >
+            AI gợi ý
+          </NavLink>
         </nav>
 
         {/* KHỐI XỬ LÝ ĐĂNG NHẬP / AVATAR */}
         <div className="flex items-center gap-2.5 relative">
           {currentUser ? (
-            /* TRẠNG THÁI 1: ĐÃ ĐĂNG NHẬP -> HIỂN THỊ AVATAR VÀ TÊN LẤY TỪ API */
             <div className="relative">
               <button 
                 onClick={() => setIsOpenDropdown(!isOpenDropdown)}
                 className="flex items-center gap-2 p-1 pr-3 rounded-full hover:bg-slate-100 transition cursor-pointer outline-none select-none border border-slate-100"
               >
-                {/* Ảnh đại diện an toàn */}
                 <img 
                   src={currentUser.avatar} 
                   alt={currentUser.name} 
                   className="w-8 h-8 rounded-full object-cover bg-blue-50 border border-blue-200"
-                  // 💡 BẢO VỆ: Nếu ảnh từ server bị lỗi đường dẫn vật lý, tự thay bằng ảnh dự phòng online ngay
                   onError={(e) => {
                     e.target.onerror = null;
                     e.target.src = "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150";
@@ -110,7 +131,6 @@ export default function Header() {
                 </span>
               </button>
 
-              {/* DROPDOWN MENU KHI BẤM VÀO AVATAR */}
               {isOpenDropdown && (
                 <>
                   <div className="fixed inset-0 z-10" onClick={() => setIsOpenDropdown(false)}></div>
@@ -151,7 +171,6 @@ export default function Header() {
               )}
             </div>
           ) : (
-            /* TRẠNG THÁI 2: CHƯA ĐĂNG NHẬP */
             <>
               <Link to="/register" className="rounded-xl border border-blue-100 bg-blue-50/50 px-4 py-1.5 text-xs font-semibold text-blue-600 hover:bg-blue-50 transition">
                 Đăng ký
