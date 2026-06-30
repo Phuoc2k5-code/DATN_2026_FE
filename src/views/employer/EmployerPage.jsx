@@ -29,6 +29,7 @@ export default function EmployerPage() {
     const [candidates, setCandidates] = useState([]);
     const [skills, setSkills] = useState([]);
     const [weekOffset, setWeekOffset] = useState(0);
+    const [skillsList, setSkillsList] = useState([]);
     const [dashboardStats, setDashboardStats] = useState({
         activeJobs: 0,
         totalJobs: 0,
@@ -61,10 +62,18 @@ export default function EmployerPage() {
     }, [activeTab, weekOffset]);
 
     const [newJob, setNewJob] = useState({
-        title: "", category_id: 1, level: "Nhân viên",
-        salary_min: "", salary_max: "", is_negotiable: false,
-        location: "", description: "", requirements: "", benefits: "",
-        expired_at: ""
+        title: "",
+        category_id: "",
+        level: "Nhân viên",
+        salary_min: "",
+        salary_max: "",
+        is_negotiable: false,
+        location: "",
+        description: "",
+        requirements: "",
+        benefits: "",
+        expired_at: "",
+        skills: []
     });
 
     useEffect(() => {
@@ -185,9 +194,15 @@ export default function EmployerPage() {
     const handleCreateJob = async (e) => {
         e.preventDefault(); // Chặn hành vi tải lại trang mặc định của Form html
 
-        // Kiểm tra logic nếu không thỏa thuận thì phải nhập đủ mức lương
+        //  Kiểm tra logic nếu không thỏa thuận thì phải nhập đủ mức lương
         if (!newJob.is_negotiable && (!newJob.salary_min || !newJob.salary_max)) {
             alert("Vui lòng nhập đầy đủ Mức lương tối thiểu và tối đa!");
+            return;
+        }
+
+        //  Kiểm tra xem nhà tuyển dụng đã chọn ít nhất 1 kỹ năng chưa
+        if (!newJob.skills || newJob.skills.length === 0) {
+            alert("Vui lòng chọn ít nhất một kỹ năng chuyên môn yêu cầu!");
             return;
         }
 
@@ -200,18 +215,32 @@ export default function EmployerPage() {
             if (response.data.success) {
                 alert(response.data.message);
                 setIsAddModalOpen(false); // Đóng Modal
-                // Reset lại form trống
+
+                // bổ sung skills: [] để làm sạch form hoàn toàn
                 setNewJob({
-                    title: "", category_id: 1, level: "Nhân viên",
-                    salary_min: "", salary_max: "", is_negotiable: false,
-                    location: "", description: "", requirements: "", benefits: "",
-                    expired_at: ""
+                    title: "",
+                    category_id: "", //để trống để hiển thị placeholder mặc định
+                    level: "Nhân viên",
+                    salary_min: "",
+                    salary_max: "",
+                    is_negotiable: false,
+                    location: "",
+                    description: "",
+                    requirements: "",
+                    benefits: "",
+                    expired_at: "",
+                    skills: [] // <--- THÊM DÒNG NÀY ĐỂ RESET KHÔNG BỊ LỖI LƯU THẺ CŨ
                 });
+
                 loadEmployerJobs(); // Cập nhật lại danh sách tự động
             }
         } catch (err) {
+            // Sửa lại cách hiển thị lỗi validation để tránh crash giao diện
             if (err.response && err.response.data && err.response.data.errors) {
-                alert(Object.values(err.response.data.errors)[0][0]);
+                const errorMessages = Object.values(err.response.data.errors).flat();
+                alert(errorMessages[0] || "Dữ liệu nhập vào không hợp lệ!");
+            } else if (err.response && err.response.data && err.response.data.message) {
+                alert(err.response.data.message);
             } else {
                 alert("Có lỗi xảy ra khi đăng tin. Vui lòng thử lại!");
             }
@@ -219,43 +248,72 @@ export default function EmployerPage() {
     };
     // Hàm mở Modal Sửa và nạp dữ liệu cũ vào form
     const handleOpenEdit = (job) => {
+        // Ép toàn bộ ID kỹ năng cũ về dạng số nguyên (VD: [4, 16, 27]) để so sánh không bị lỗi
+        const oldSkillIds = job.skills
+            ? job.skills.map(skill => Number(typeof skill === 'object' ? skill.id : skill))
+            : [];
+
         setEditingJob({
             ...job,
-            // Ép kiểu dữ liệu dưới database (1/0) thành true/false cho checkbox React hiểu
-            is_negotiable: job.is_negotiable === 1 || job.is_negotiable === true,
+            is_negotiable: Boolean(job.is_negotiable), // true/false
             salary_min: job.salary_min || "",
             salary_max: job.salary_max || "",
-            benefits: job.benefits || ""
+            benefits: job.benefits || "",
+            // Lưu mảng ID vào form
+            skills: oldSkillIds
         });
+
         setIsEditModalOpen(true);
     };
     // Hàm gửi API cập nhật
     const handleUpdateJob = async (e) => {
         e.preventDefault();
-
-        if (!editingJob.is_negotiable && (!editingJob.salary_min || !editingJob.salary_max)) {
-            alert("Vui lòng nhập đầy đủ Mức lương tối thiểu và tối đa!");
-            return;
-        }
-
         try {
-            const token = localStorage.getItem("token");
-            const response = await axios.put(`http://127.0.0.1:8000/api/employer/jobs/${editingJob.id}`, editingJob, {
-                headers: { Authorization: `Bearer ${token}` }
-            });
+            // Đóng gói dữ liệu gửi lên Laravel
+            const payload = {
+                title: editingJob.title,
+                category_id: editingJob.category_id,
+                level: editingJob.level,
+                location: editingJob.location,
+                salary_min: editingJob.salary_min || null,
+                salary_max: editingJob.salary_max || null,
+                is_negotiable: editingJob.is_negotiable ? 1 : 0,
+                description: editingJob.description,
+                requirements: editingJob.requirements,
+                benefits: editingJob.benefits || null,
+                skills: editingJob.skills || []
+            };
 
-            if (response.data.success) {
-                alert(response.data.message);
+            const token = localStorage.getItem("token");
+
+            const response = await axios.put(
+                `http://127.0.0.1:8000/api/employer/jobs/${editingJob.id}`,
+                payload,
+                {
+                    headers: {
+                        Authorization: `Bearer ${token}`,
+                        Accept: "application/json",
+                    },
+                }
+            );
+            if (response.data && response.data.success) {
+                alert("Cập nhật thành công!");
+                const updatedSkillsWithNames = editingJob.skills.map(id => {
+                    return skillsList.find(s => s.id === id) || { id: id, name: 'Unknown' };
+                });
+
+                // 2. Cập nhật state danh sách jobs của bạn
+                setJobs(prevJobs => prevJobs.map(job =>
+                    job.id === editingJob.id
+                        ? { ...job, ...payload, skills: updatedSkillsWithNames }
+                        : job
+                ));
                 setIsEditModalOpen(false);
-                setEditingJob(null);
-                loadEmployerJobs(); // Cập nhật lại danh sách tự động
+                // Gọi lại hàm fetch data (ví dụ: fetchCompanyJobs()) ở đây để làm mới danh sách bài viết
             }
-        } catch (err) {
-            if (err.response && err.response.data && err.response.data.errors) {
-                alert(Object.values(err.response.data.errors)[0][0]);
-            } else {
-                alert("Có lỗi xảy ra khi cập nhật. Vui lòng thử lại!");
-            }
+        } catch (error) {
+            console.error("Lỗi khi cập nhật:", error);
+            alert("Cập nhật thất bại, vui lòng kiểm tra lại dữ liệu.");
         }
     };
     const filteredJobs = jobs.filter((job) =>
@@ -394,9 +452,14 @@ export default function EmployerPage() {
     };
     // Gọi API lấy toàn bộ kỹ năng khi component được render lần đầu
     useEffect(() => {
-        axios.get('http://127.0.0.1:8000/api/skills') // Thay bằng URL API thực tế của bạn
+        axios.get('http://127.0.0.1:8000/api/skills')
             .then(res => {
-                setSkills(res.data);
+                // Kiểm tra nếu API trả về có thuộc tính data thì lấy res.data.data
+                if (res.data && res.data.data) {
+                    setSkills(res.data.data);
+                } else {
+                    setSkills(res.data); // Dự phòng nếu API trả về mảng trực tiếp
+                }
             })
             .catch(err => console.error("Lỗi lấy danh sách kỹ năng:", err));
     }, []);
@@ -449,6 +512,40 @@ export default function EmployerPage() {
             fetchStats();
         }
     }, [activeTab]); // React sẽ tự động gọi lại hàm này nếu bạn bấm chuyển sang tab dashboard
+
+    useEffect(() => {
+        const fetchAllSkills = async () => {
+            console.log("🚀 BƯỚC 1: Bắt đầu gọi API lấy danh sách kỹ năng...");
+            try {
+                // LƯU Ý: Thay đổi URL nếu Backend của bạn chạy ở port khác
+                const response = await axios.get('http://127.0.0.1:8000/api/skills');
+
+                console.log("✅ BƯỚC 2: API đã gọi thành công! Dữ liệu trả về là:", response);
+
+                // Bắt bệnh cấu trúc dữ liệu
+                if (response.data && response.data.data) {
+                    console.log("🎯 BƯỚC 3: Dữ liệu dạng { success: true, data: [...] }. Đã lưu vào state!");
+                    setSkillsList(response.data.data);
+                }
+                else if (Array.isArray(response.data)) {
+                    console.log("🎯 BƯỚC 3: Dữ liệu trả về mảng trực tiếp [...]. Đã lưu vào state!");
+                    setSkillsList(response.data);
+                }
+                else {
+                    console.warn("⚠️ BƯỚC 3: Cấu trúc dữ liệu lạ, không tìm thấy mảng skills!", response.data);
+                }
+
+            } catch (error) {
+                console.error("❌ LỖI RỒI: Không thể gọi được API lấy kỹ năng!");
+                console.error("Chi tiết lỗi:", error.message);
+                if (error.response) {
+                    console.error("Backend Laravel báo lỗi:", error.response.data);
+                }
+            }
+        };
+
+        fetchAllSkills();
+    }, []);
 
     return (
         <div className="w-full min-h-screen bg-[#FFFDF9] font-sans text-slate-800 antialiased flex">
@@ -1338,9 +1435,29 @@ export default function EmployerPage() {
                                 </div>
                                 <div>
                                     <div className="text-[10px] uppercase font-bold text-slate-400 mb-1">Hạn nộp hồ sơ</div>
-                                    <div className="text-sm font-semibold text-rose-600">{selectedJob.deadline}</div>
+                                    <div className="text-sm font-semibold text-rose-600">{selectedJob.deadline || selectedJob.expired_at}</div>
                                 </div>
                             </div>
+
+                            {/* ==================== KHU VỰC HIỂN THỊ KỸ NĂNG (ĐÃ THÊM MỚI) ==================== */}
+                            <div>
+                                <h4 className="text-sm font-bold text-slate-800 mb-2 border-l-4 border-emerald-500 pl-2">Kỹ năng chuyên môn yêu cầu</h4>
+                                <div className="flex flex-wrap gap-2 bg-slate-50/50 border border-slate-100 p-3 rounded-xl">
+                                    {selectedJob.skills && selectedJob.skills.length > 0 ? (
+                                        selectedJob.skills.map((skill, index) => (
+                                            <span
+                                                key={skill.id || index}
+                                                className="px-3 py-1 bg-emerald-50 text-emerald-700 text-xs font-semibold rounded-full border border-emerald-200 shadow-sm"
+                                            >
+                                                {skill.name || skill}
+                                            </span>
+                                        ))
+                                    ) : (
+                                        <span className="text-xs text-slate-400 italic">Không có yêu cầu kỹ năng đặc biệt</span>
+                                    )}
+                                </div>
+                            </div>
+                            {/* ============================================================================== */}
 
                             {/* Mô tả công việc */}
                             <div>
@@ -1519,7 +1636,61 @@ export default function EmployerPage() {
                                         <input required type="date" min={new Date(new Date().setDate(new Date().getDate() + 1)).toISOString().split('T')[0]} value={newJob.expired_at} onChange={e => setNewJob({ ...newJob, expired_at: e.target.value })} className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm outline-none focus:border-emerald-400" />
                                     </div>
                                 </div>
+                                <div className="col-span-1 md:col-span-2">
+                                    <label className="block text-xs font-bold text-slate-700 mb-1.5">
+                                        Kỹ năng chuyên môn yêu cầu <span className="text-rose-500">*</span>
+                                        <span className="text-slate-400 font-normal ml-1">(Bấm để chọn hoặc bỏ chọn nhiều kỹ năng)</span>
+                                    </label>
 
+                                    {/* Khung bo góc chứa các nút kỹ năng, tự động sinh thanh cuộn nếu quá dài */}
+                                    <div className="w-full border border-slate-200 rounded-lg p-3 bg-slate-50/50 max-h-40 overflow-y-auto custom-scrollbar flex flex-wrap gap-2">
+                                        {skills && skills.length > 0 ? (
+                                            skills.map((skill) => {
+                                                // Kiểm tra kỹ năng hiện tại đã được bấm chọn hay chưa
+                                                const isSelected = newJob.skills && newJob.skills.includes(skill.id);
+
+                                                return (
+                                                    <button
+                                                        key={skill.id}
+                                                        type="button" // QUAN TRỌNG: Ngăn chặn hành vi tự động submit form của trình duyệt
+                                                        onClick={() => {
+                                                            const currentSkills = newJob.skills || [];
+                                                            if (currentSkills.includes(skill.id)) {
+                                                                // Nếu tồn tại rồi -> Xóa ID khỏi mảng (Bỏ chọn)
+                                                                setNewJob({
+                                                                    ...newJob,
+                                                                    skills: currentSkills.filter(id => id !== skill.id)
+                                                                });
+                                                            } else {
+                                                                // Nếu chưa tồn tại -> Thêm ID vào mảng (Chọn)
+                                                                setNewJob({
+                                                                    ...newJob,
+                                                                    skills: [...currentSkills, skill.id]
+                                                                });
+                                                            }
+                                                        }}
+                                                        className={`px-3 py-1 text-xs font-medium rounded-full border transition-all duration-150 ${isSelected
+                                                            ? "bg-emerald-500 text-white border-emerald-500 shadow-sm shadow-emerald-100" // Màu khi được chọn
+                                                            : "bg-white text-slate-600 border-slate-200 hover:border-slate-300 hover:bg-slate-100" // Màu mặc định
+                                                            }`}
+                                                    >
+                                                        {skill.name}
+                                                        {isSelected && <span className="ml-1.5 text-[10px]">✓</span>}
+                                                    </button>
+                                                );
+                                            })
+                                        ) : (
+                                            <p className="text-xs text-slate-400 italic py-1">Đang kết nối hệ thống tải danh sách kỹ năng...</p>
+                                        )}
+                                    </div>
+
+                                    {/* Hiển thị số lượng kỹ năng đã chọn dưới chân khung */}
+                                    {newJob.skills && newJob.skills.length > 0 && (
+                                        <p className="text-[11px] text-emerald-600 font-medium mt-1">
+                                            Đã chọn {newJob.skills.length} kỹ năng yêu cầu.
+                                        </p>
+                                    )}
+                                </div>
                                 {/* Các ô mô tả Textarea rộng */}
                                 <div>
                                     <label className="block text-xs font-bold text-slate-700 mb-1">Mô tả chi tiết công việc <span className="text-rose-500">*</span></label>
@@ -1551,7 +1722,7 @@ export default function EmployerPage() {
                 </div>
             )}
             {/* ========================================== */}
-            {/* KHU VỰC MODAL SỬA TIN TUYỂN DỤNG           */}
+            {/* KHU VỰC MODAL SỬA TIN TUYỂN DỤNG */}
             {/* ========================================== */}
             {isEditModalOpen && editingJob && (
                 <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/50 backdrop-blur-sm p-4">
@@ -1598,21 +1769,71 @@ export default function EmployerPage() {
 
                                     <div className="relative">
                                         <label className="block text-xs font-bold text-slate-700 mb-1">Mức lương tối thiểu (VNĐ)</label>
-                                        <input type="number" disabled={editingJob.is_negotiable} value={editingJob.salary_min} onChange={e => setEditingJob({ ...editingJob, salary_min: e.target.value })} className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm outline-none focus:border-blue-400 disabled:bg-slate-100 disabled:text-slate-400 disabled:cursor-not-allowed" />
+                                        <input type="number" disabled={editingJob.is_negotiable} value={editingJob.salary_min || ""} onChange={e => setEditingJob({ ...editingJob, salary_min: e.target.value })} className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm outline-none focus:border-blue-400 disabled:bg-slate-100 disabled:text-slate-400 disabled:cursor-not-allowed" />
                                     </div>
 
                                     <div className="relative">
                                         <label className="block text-xs font-bold text-slate-700 mb-1">Mức lương tối đa (VNĐ)</label>
-                                        <input type="number" disabled={editingJob.is_negotiable} value={editingJob.salary_max} onChange={e => setEditingJob({ ...editingJob, salary_max: e.target.value })} className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm outline-none focus:border-blue-400 disabled:bg-slate-100 disabled:text-slate-400 disabled:cursor-not-allowed" />
+                                        <input type="number" disabled={editingJob.is_negotiable} value={editingJob.salary_max || ""} onChange={e => setEditingJob({ ...editingJob, salary_max: e.target.value })} className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm outline-none focus:border-blue-400 disabled:bg-slate-100 disabled:text-slate-400 disabled:cursor-not-allowed" />
                                     </div>
 
-                                    <div className="flex items-center">
+                                    <div className="flex items-center md:col-span-2">
                                         <label className="flex items-center cursor-pointer group">
                                             <input type="checkbox" checked={editingJob.is_negotiable} onChange={e => setEditingJob({ ...editingJob, is_negotiable: e.target.checked, salary_min: "", salary_max: "" })} className="w-4 h-4 text-blue-600 border-slate-300 rounded focus:ring-blue-500 cursor-pointer" />
                                             <span className="ml-2 text-sm font-bold text-blue-600 group-hover:text-blue-700 transition-colors">Thỏa thuận lương (Không bắt buộc nhập số)</span>
                                         </label>
                                     </div>
                                 </div>
+
+                                {/* ======================================================== */}
+                                {/* KHU VỰC THÊM MỚI: CHỌN VÀ CHỈNH SỬA KỸ NĂNG (SKILLS) */}
+                                <div className="border border-slate-100 p-4 rounded-xl bg-slate-50/50 md:col-span-2">
+                                    <label className="block text-xs font-bold text-slate-700 mb-2">
+                                        Kỹ năng chuyên môn yêu cầu <span className="text-rose-500">*</span>
+                                    </label>
+
+                                    <div className="flex flex-wrap gap-2 max-h-[150px] overflow-y-auto p-2 border border-slate-200 rounded-lg bg-white custom-scrollbar">
+                                        {skillsList.length > 0 ? (
+                                            skillsList.map((skill) => {
+                                                const skillId = Number(skill.id);
+                                                // Kiểm tra xem ID kỹ năng này có nằm trong mảng editingJob.skills không
+                                                const isSelected = (editingJob.skills || []).includes(skillId);
+
+                                                return (
+                                                    <button
+                                                        type="button"
+                                                        key={skillId}
+                                                        onClick={() => {
+                                                            // LOGIC CHỌN / BỎ CHỌN
+                                                            const currentSkills = editingJob.skills || [];
+                                                            let newSkills;
+
+                                                            if (isSelected) {
+                                                                // Nếu đang xanh -> Bấm vào là XÓA
+                                                                newSkills = currentSkills.filter(id => id !== skillId);
+                                                            } else {
+                                                                // Nếu chưa xanh -> Bấm vào là THÊM
+                                                                newSkills = [...currentSkills, skillId];
+                                                            }
+
+                                                            // Cập nhật lại state form
+                                                            setEditingJob({ ...editingJob, skills: newSkills });
+                                                        }}
+                                                        className={`px-3 py-1.5 rounded-full text-xs font-semibold transition-all duration-200 border ${isSelected
+                                                            ? 'bg-blue-600 border-blue-600 text-white shadow-sm' // Màu khi được chọn
+                                                            : 'bg-slate-100 border-slate-200 text-slate-600 hover:bg-slate-200' // Màu khi chưa chọn
+                                                            }`}
+                                                    >
+                                                        {skill.name} {isSelected && '✓'}
+                                                    </button>
+                                                );
+                                            })
+                                        ) : (
+                                            <p className="text-xs text-slate-400 italic p-1">Đang tải danh sách kỹ năng...</p>
+                                        )}
+                                    </div>
+                                </div>
+                                {/* ======================================================== */}
 
                                 <div>
                                     <label className="block text-xs font-bold text-slate-700 mb-1">Mô tả chi tiết công việc <span className="text-rose-500">*</span></label>
@@ -1626,7 +1847,7 @@ export default function EmployerPage() {
 
                                 <div>
                                     <label className="block text-xs font-bold text-slate-700 mb-1">Quyền lợi được hưởng (Tùy chọn)</label>
-                                    <textarea rows="3" value={editingJob.benefits} onChange={e => setEditingJob({ ...editingJob, benefits: e.target.value })} className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm outline-none focus:border-blue-400 custom-scrollbar"></textarea>
+                                    <textarea rows="3" value={editingJob.benefits || ""} onChange={e => setEditingJob({ ...editingJob, benefits: e.target.value })} className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm outline-none focus:border-blue-400 custom-scrollbar"></textarea>
                                 </div>
                             </form>
                         </div>
