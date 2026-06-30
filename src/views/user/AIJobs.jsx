@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { ArrowLeft, Sparkles, BrainCircuit, Target, Lightbulb, Loader2, FileText, UserCheck, LogIn, Lock } from 'lucide-react';
-import axios from 'axios'; 
-import Job from '../../components/JobCard'; 
+import axios from 'axios';
+import Job from '../../components/JobCard';
 
 export default function AiJobs() {
   const navigate = useNavigate();
@@ -16,9 +16,9 @@ export default function AiJobs() {
   const [selectedCv, setSelectedCv] = useState(() => {
     const savedType = localStorage.getItem('last_ai_cv_type');
     const savedId = localStorage.getItem('last_ai_cv_id');
-    return { 
-      type: savedType || '', 
-      id: savedId || '' 
+    return {
+      type: savedType || '',
+      id: savedId || ''
     };
   });
 
@@ -67,16 +67,22 @@ export default function AiJobs() {
           'Authorization': `Bearer ${token}`,
           'Accept': 'application/json'
         },
-        signal: abortControllerRef.current.signal 
+        signal: abortControllerRef.current.signal
       });
 
       if (response.data && response.data.success) {
+        // 🌟 BƯỚC FIX: Giữ nguyên object gốc và bổ sung các trường format tương thích với Component JobCard cũ nếu cần
         const mappedJobs = response.data.data.map(job => ({
-          id: job.id,
-          title: job.title,
-          company: job.company?.name || "Nhà tuyển dụng",
+          ...job, // Truyền TOÀN BỘ object gốc sang (gồm id, title, location, salary_min, salary_max, company, skills, category)
+          company: {
+            ...job.company,
+            name: job.company?.company_name || "Nhà tuyển dụng", // Dự phòng nếu JobCard gọi job.company.name
+            company_name: job.company?.company_name || "Nhà tuyển dụng" // Dự phòng nếu JobCard gọi job.company.company_name
+          },
           location: job.location || "Toàn quốc",
-          salary: job.salary || "Thỏa thuận",
+          salary: job.is_negotiable
+            ? "Thỏa thuận"
+            : `${(job.salary_min / 1000000).toFixed(0)}tr - ${(job.salary_max / 1000000).toFixed(0)}tr`, // Format lương triệu đồng cho đẹp giao diện
           logoBg: job.logo_bg || "bg-orange-600",
           tags: job.skills ? job.skills.map(s => s.name) : [],
           matchScore: Math.round(job.matching_score || 0),
@@ -126,7 +132,7 @@ export default function AiJobs() {
     if (!combinedValue) return;
 
     const [type, cvId] = combinedValue.split('_');
-    
+
     setSelectedCv({ type, id: cvId });
     fetchAiRecommendations(type, cvId); // Gửi thẳng ID mới lên để BE bắt buộc phân tích cái mới
   };
@@ -135,7 +141,7 @@ export default function AiJobs() {
     <div className="min-h-screen bg-[#FFFDF9] text-slate-800 antialiased pb-16 w-full text-left">
       <div className="w-full bg-gradient-to-br from-orange-100/80 via-amber-50/50 to-white pt-8 pb-12 px-4 border-b border-orange-100/70 shadow-xs">
         <div className="max-w-[1550px] mx-auto flex flex-col md:flex-row md:items-center justify-between gap-6">
-          
+
           <div className="flex items-center gap-4">
             <div className="p-3 rounded-2xl bg-gradient-to-tr from-orange-500 to-amber-500 text-white shadow-md">
               <BrainCircuit size={28} className={loading ? "animate-spin" : ""} />
@@ -155,7 +161,7 @@ export default function AiJobs() {
             <FileText size={16} className="text-orange-500 shrink-0" />
             <div className="w-full">
               <label className="block text-[9px] uppercase font-bold text-slate-400">Nguồn phân tích</label>
-              <select 
+              <select
                 // 🌟 ĐỒNG BỘ VALUE ĐỂ DROP DOWN LUÔN SÁNG ĐÚNG CV ĐANG XEM
                 value={selectedCv.type && selectedCv.id ? `${selectedCv.type}_${selectedCv.id}` : ''}
                 onChange={handleCvChange}
