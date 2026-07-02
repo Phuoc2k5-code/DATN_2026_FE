@@ -1,14 +1,14 @@
 import React, { useState, useEffect } from 'react';
-import { 
-  Loader2, 
-  AlertTriangle, 
-  Briefcase, 
-  Building2, 
-  Layers, 
-  X, 
-  Calendar, 
-  User, 
-  FileText, 
+import {
+  Loader2,
+  AlertTriangle,
+  Briefcase,
+  Building2,
+  Layers,
+  X,
+  Calendar,
+  User,
+  FileText,
   CheckCircle,
   ChevronLeft, // Icon cho nút chuyển trang trước
   ChevronRight // Icon cho nút chuyển trang sau
@@ -18,7 +18,7 @@ export default function ReportManagement() {
   const [reports, setReports] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  
+
   // Quản lý 2 bộ lọc trạng thái và loại đối tượng
   const [statusFilter, setStatusFilter] = useState('all');
   const [typeFilter, setTypeFilter] = useState('all');
@@ -50,26 +50,26 @@ export default function ReportManagement() {
         'Authorization': `Bearer ${token}`
       }
     })
-    .then(response => {
-      if (!response.ok) throw new Error('Không thể tải danh sách báo cáo.');
-      return response.json();
-    })
-    .then(res => {
-      if (res.success) {
-        setReports(res.data);
-        // Đồng bộ dữ liệu phân trang từ Server Laravel đổ về
-        if (res.pagination) {
-          setCurrentPage(res.pagination.current_page);
-          setLastPage(res.pagination.last_page);
+      .then(response => {
+        if (!response.ok) throw new Error('Không thể tải danh sách báo cáo.');
+        return response.json();
+      })
+      .then(res => {
+        if (res.success) {
+          setReports(res.data);
+          // Đồng bộ dữ liệu phân trang từ Server Laravel đổ về
+          if (res.pagination) {
+            setCurrentPage(res.pagination.current_page);
+            setLastPage(res.pagination.last_page);
+          }
         }
-      }
-      setLoading(false);
-    })
-    .catch(err => {
-      console.error(err);
-      setError('Có lỗi xảy ra khi kết nối đến máy chủ.');
-      setLoading(false);
-    });
+        setLoading(false);
+      })
+      .catch(err => {
+        console.error(err);
+        setError('Có lỗi xảy ra khi kết nối đến máy chủ.');
+        setLoading(false);
+      });
   };
 
   // Tự động kích hoạt gọi API khi người dùng thay đổi bộ lọc hoặc đổi trang
@@ -100,7 +100,7 @@ export default function ReportManagement() {
   const handleShowDetail = (id) => {
     setLoadingDetail(true);
     setIsModalOpen(true);
-    
+
     fetch(`${API_BASE_URL}/reports/${id}`, {
       method: 'GET',
       headers: {
@@ -108,22 +108,22 @@ export default function ReportManagement() {
         'Authorization': `Bearer ${token}`
       }
     })
-    .then(response => {
-      if (!response.ok) throw new Error('Không thể tải chi tiết báo cáo.');
-      return response.json();
-    })
-    .then(res => {
-      if (res.success) {
-        setSelectedReport(res.data);
-      }
-      setLoadingDetail(false);
-    })
-    .catch(err => {
-      console.error(err);
-      alert('Không thể lấy thông tin chi tiết.');
-      setIsModalOpen(false);
-      setLoadingDetail(false);
-    });
+      .then(response => {
+        if (!response.ok) throw new Error('Không thể tải chi tiết báo cáo.');
+        return response.json();
+      })
+      .then(res => {
+        if (res.success) {
+          setSelectedReport(res.data);
+        }
+        setLoadingDetail(false);
+      })
+      .catch(err => {
+        console.error(err);
+        alert('Không thể lấy thông tin chi tiết.');
+        setIsModalOpen(false);
+        setLoadingDetail(false);
+      });
   };
 
   // ================= 3. HÀM XỬ LÝ BÁC BỎ BÁO CÁO =================
@@ -137,12 +137,12 @@ export default function ReportManagement() {
         },
         body: JSON.stringify({ admin_note: 'Báo cáo bị bác bỏ bởi Admin do thiếu căn cứ.' })
       })
-      .then(res => res.json())
-      .then(data => {
-        if (data.success) {
-          setReports(reports.map(r => r.id === id ? { ...r, status: 'dismissed' } : r));
-        }
-      });
+        .then(res => res.json())
+        .then(data => {
+          if (data.success) {
+            setReports(reports.map(r => r.id === id ? { ...r, status: 'dismissed' } : r));
+          }
+        });
     }
   };
 
@@ -158,18 +158,18 @@ export default function ReportManagement() {
         },
         body: JSON.stringify({ admin_note: note })
       })
-      .then(res => res.json())
-      .then(data => {
-        if (data.success) {
-          alert(data.message);
-          setReports(reports.map(r => r.id === id ? { ...r, status: 'resolved' } : r));
-        }
-      });
+        .then(res => res.json())
+        .then(data => {
+          if (data.success) {
+            alert(data.message);
+            setReports(reports.map(r => r.id === id ? { ...r, status: 'resolved' } : r));
+          }
+        });
     }
   };
 
   const renderStatusBadge = (status) => {
-    switch(status) {
+    switch (status) {
       case 'pending':
         return <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-amber-50 text-amber-700 border border-amber-200">Chờ xử lý</span>;
       case 'resolved':
@@ -183,14 +183,14 @@ export default function ReportManagement() {
 
   return (
     <div className="bg-slate-50 min-h-screen font-sans text-slate-800 p-6 relative">
-      
+
       {/* Header Section */}
       <div className="mb-8 flex flex-col lg:flex-row lg:items-center justify-between gap-4 border-b border-slate-200 pb-6">
         <div>
           <h1 className="text-2xl font-extrabold text-slate-900 tracking-tight">Báo cáo vi phạm</h1>
           <p className="text-sm text-slate-500 mt-1">Quản lý, theo dõi số lượt và kiểm duyệt phản ánh cộng đồng.</p>
         </div>
-        
+
         {/* Bộ lọc Pills */}
         <div className="flex flex-wrap items-center gap-4">
           <div className="inline-flex bg-slate-200/60 p-1 rounded-lg">
@@ -265,7 +265,10 @@ export default function ReportManagement() {
                       </td>
                       <td className="px-6 py-4">
                         <div className="text-red-600/80 font-semibold">{report.reason_type}</div>
-                        <div className="text-xs text-slate-500 max-w-[200px] truncate mt-0.5">{report.description || 'Không có mô tả chi tiết'}</div>
+                        {/* 🚀 ĐÃ SỬA: Bỏ truncate, thêm break-words và whitespace-pre-line để tự động xuống dòng đầy đủ */}
+                        <div className="text-xs text-slate-500 mt-0.5 break-words whitespace-pre-line">
+                          {report.description || 'Không có mô tả chi tiết'}
+                        </div>
                       </td>
                       <td className="px-6 py-4 text-slate-500">{new Date(report.created_at).toLocaleDateString('vi-VN')}</td>
                       <td className="px-6 py-4">{renderStatusBadge(report.status)}</td>
@@ -285,7 +288,7 @@ export default function ReportManagement() {
                   );
                 })
               )}
-              
+
               {!loading && reports.length === 0 && (
                 <tr>
                   <td colSpan="7" className="px-6 py-12 text-center text-slate-400">
@@ -303,7 +306,7 @@ export default function ReportManagement() {
             <div className="text-sm text-slate-500">
               Trang <span className="font-semibold text-slate-700">{currentPage}</span> trên tổng số <span className="font-semibold text-slate-700">{lastPage}</span>
             </div>
-            
+
             <div className="flex items-center space-x-2">
               <button
                 onClick={() => handlePageChange(currentPage - 1)}
@@ -331,14 +334,14 @@ export default function ReportManagement() {
       {isModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-sm p-4 animate-fade-in">
           <div className="bg-white w-full max-w-xl rounded-2xl shadow-xl border border-slate-100 overflow-hidden flex flex-col max-h-[90vh]">
-            
+
             {/* Modal Header */}
             <div className="px-6 py-4 bg-slate-50 border-b border-slate-100 flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <FileText className="h-5 w-5 text-blue-600" />
                 <h3 className="text-base font-bold text-slate-900">Hồ Sơ Chi Tiết Báo Cáo Vi Phạm</h3>
               </div>
-              <button 
+              <button
                 onClick={() => { setIsModalOpen(false); setSelectedReport(null); }}
                 className="text-slate-400 hover:text-slate-600 p-1 rounded-full hover:bg-slate-200/50 transition-colors"
               >
@@ -408,7 +411,7 @@ export default function ReportManagement() {
 
             {/* Modal Footer */}
             <div className="px-6 py-4 bg-slate-50 border-t border-slate-100 flex justify-end">
-              <button 
+              <button
                 onClick={() => { setIsModalOpen(false); setSelectedReport(null); }}
                 className="px-4 py-2 bg-slate-200 text-slate-700 font-bold text-sm rounded-xl hover:bg-slate-300 transition-colors"
               >

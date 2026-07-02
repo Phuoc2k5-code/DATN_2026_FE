@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { AlertCircle, AlertTriangle, X } from 'lucide-react';
-import axios from 'axios'; // 🚀 BỔ SUNG: Import axios để gọi API
+import axios from 'axios';
 
 export default function ReportModal({
   isOpen,          // Trạng thái đóng/mở (true/false) từ trang cha truyền vào
@@ -11,7 +11,7 @@ export default function ReportModal({
 }) {
   const [reportReason, setReportReason] = useState('');
   const [reportDescription, setReportDescription] = useState('');
-  const [loading, setLoading] = useState(false); // 🚀 BỔ SUNG: Trạng thái chờ khi gửi API
+  const [loading, setLoading] = useState(false); // Trạng thái chờ khi gửi API
 
   // Nếu trạng thái đóng thì không render gì cả
   if (!isOpen) return null;
@@ -35,32 +35,12 @@ export default function ReportModal({
 
   const activeReasons = type === 'company' ? companyReasons : jobReasons;
 
-  // 🚀 HÀM MỚI: Chuyển đổi chữ Tiếng Việt giao diện sang mã Tiếng Anh mà Backend yêu cầu
-  const getReasonType = (textReason) => {
-    switch (textReason) {
-      case "Thông tin tuyển dụng lừa đảo, giả mạo":
-      case "Yêu cầu đóng phí ứng tuyển, đặt cọc tiền":
-        return 'fraud';
-      case "Địa chỉ hoặc thông tin công ty không có thật":
-        return 'wrong_info';
-      case "Ngôn từ không phù hợp, phân biệt đối xử":
-      case "Đăng tin spam, quấy rối ứng viên":
-        return 'bad_behavior';
-      case "Công ty ma, không có hoạt động trên thực tế":
-      case "Mạo danh thương hiệu doanh nghiệp lớn khác":
-        return 'fake_company';
-      default:
-        return 'other'; // "Lý do khác" hoặc các vi phạm môi trường làm việc
-    }
-  };
-
   // Xử lý gửi dữ liệu lên hệ thống
   const handleSubmit = async (e) => {
     e.preventDefault();
     const token = localStorage.getItem('token'); 
     if (!token) {
       alert("Chức năng này yêu cầu đăng nhập. Vui lòng đăng nhập tài khoản ứng viên để tiếp tục!");
-      setLoading(false);
       return;
     }
     if (!reportReason) {
@@ -71,16 +51,15 @@ export default function ReportModal({
     setLoading(true);
 
     try {     
-      
-      // 2. Gom dữ liệu đúng định dạng gôm chung của Controller
+      // Gom dữ liệu đúng định dạng gửi trực tiếp Tiếng Việt lên Backend
       const payload = {
         id: targetId,
         type: type, // 'job' hoặc 'company'
-        reason_type: getReasonType(reportReason), // Đã dịch sang tiếng Anh mã hóa
+        reason_type: reportReason, // 🚀 ĐÃ SỬA: Gửi trực tiếp text Tiếng Việt lên Backend
         description: reportDescription || null
       };
 
-      // 3. Bắn Request lên Backend
+      // Bắn Request lên Backend
       const response = await axios.post('http://localhost:8000/api/reports', payload, {
         headers: token ? { 'Authorization': `Bearer ${token}` } : {}
       });
