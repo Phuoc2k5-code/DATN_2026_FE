@@ -12,7 +12,7 @@ export default function AiJobs() {
   const [loading, setLoading] = useState(true);
   const [errorMsg, setErrorMsg] = useState(null);
 
-  // 🌟 KHỞI TẠO STATE BAN ĐẦU: Lấy lại vết từ localStorage nếu có, nếu không thì để trống (chạy Tự động)
+  // Lưu vết trạng thái từ localStorage
   const [selectedCv, setSelectedCv] = useState(() => {
     const savedType = localStorage.getItem('last_ai_cv_type');
     const savedId = localStorage.getItem('last_ai_cv_id');
@@ -23,8 +23,17 @@ export default function AiJobs() {
   });
 
   const abortControllerRef = useRef(null);
+  const pollingIntervalRef = useRef(null); // 🌟 Thêm ref để quản lý vòng lặp Interval tránh leak bộ nhớ
   const token = localStorage.getItem('token');
   const isLoggedIn = !!token;
+
+  // Xóa bỏ vòng lặp hỏi thăm cũ nếu có
+  const clearPreviousPolling = () => {
+    if (pollingIntervalRef.current) {
+      clearInterval(pollingIntervalRef.current);
+      pollingIntervalRef.current = null;
+    }
+  };
 
   // Lấy danh sách CV làm nguồn chọn cho Dropdown
   const fetchUserCvList = async () => {
@@ -41,100 +50,137 @@ export default function AiJobs() {
     }
   };
 
-  // Hàm gọi API tính điểm AI thông minh
+  // 🔥 HÀM GỌI API MỚI: Tích hợp Polling thông minh, triệt tiêu lỗi Timeout 30s
   const fetchAiRecommendations = async (type = '', id = '') => {
     if (!isLoggedIn) {
       setLoading(false);
       return;
     }
 
+    // Hủy kết nối request cũ nếu người dùng thao tác quá nhanh
     if (abortControllerRef.current) {
       abortControllerRef.current.abort();
     }
     abortControllerRef.current = new AbortController();
 
+    // Dọn dẹp các vòng lặp Polling trước đó để kích hoạt luồng quét mới
+    clearPreviousPolling();
+
     setLoading(true);
     setErrorMsg(null);
 
-    try {
-      const response = await axios.get('http://localhost:8000/api/ai-recomment', {
-        params: {
-          type: type || null,
-          id: id || null,
-          _t: new Date().getTime()
-        },
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Accept': 'application/json'
-        },
-        signal: abortControllerRef.current.signal
-      });
-
-      if (response.data && response.data.success) {
-        // 🌟 BƯỚC FIX: Giữ nguyên object gốc và bổ sung các trường format tương thích với Component JobCard cũ nếu cần
-        const mappedJobs = response.data.data.map(job => ({
-          ...job, // Truyền TOÀN BỘ object gốc sang (gồm id, title, location, salary_min, salary_max, company, skills, category)
-          company: {
-            ...job.company,
-            name: job.company?.company_name || "Nhà tuyển dụng", // Dự phòng nếu JobCard gọi job.company.name
-            company_name: job.company?.company_name || "Nhà tuyển dụng" // Dự phòng nếu JobCard gọi job.company.company_name
+    // Định nghĩa hàm thực thi một vòng lặp kiểm tra
+    const executeCheck = async () => {
+      try {
+        const response = await axios.get('http://localhost:8000/api/ai-recomment', {
+          params: {
+            type: type || null,
+            id: id || null,
+            _t: new Date().getTime()
           },
-          location: job.location || "Toàn quốc",
-          salary: job.is_negotiable
-            ? "Thỏa thuận"
-            : `${(job.salary_min / 1000000).toFixed(0)}tr - ${(job.salary_max / 1000000).toFixed(0)}tr`, // Format lương triệu đồng cho đẹp giao diện
-          logoBg: job.logo_bg || "bg-orange-600",
-          tags: job.skills ? job.skills.map(s => s.name) : [],
-          matchScore: Math.round(job.matching_score || 0),
-          aiReason: job.ai_reason || "Phù hợp với định hướng nghề nghiệp."
-        }));
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Accept': 'application/json'
+          },
+          signal: abortControllerRef.current.signal
+        });
 
-        setAiRecommendedJobs(mappedJobs);
+        if (response.data && response.data.success) {
+          // TRƯỜNG HỢP 1: Hệ thống báo hàng đợi vẫn đang xử lý ('processing')
+          if (response.data.status === 'processing') {
+    console.log("⏳ AI vẫn đang tính toán ngầm dưới Backend...");
+    return; 
+  }
 
-        // 🌟 BƯỚC QUAN TRỌNG: Lấy dữ liệu thực tế Backend vừa chạy gán ngược lại cho FE
-        const realType = response.data.analyzed_type;
-        const realId = response.data.analyzed_id;
+  // 🔥 THÊM TRƯỜNG HỢP NÀY: Nếu Backend báo 'failed', dập tắt Polling ngay lập tức!
+  if (response.data.status === 'failed') {
+    console.log("🛑 Hệ thống báo lỗi từ hàng đợi.");
+    clearPreviousPolling(); // Dừng vòng lặp hỏi thăm
+    setErrorMsg("AI xử lý quá hạn hoặc gặp sự cố. Vui lòng thử lại sau!");
+    setLoading(false);
+    return;
+  }
 
-        if (realType && realId) {
-          // Ghi nhớ vào State để Dropdown sáng đúng vị trí
-          setSelectedCv({ type: realType, id: String(realId) });
-          // Ghi nhớ vào localStorage máy người dùng để tắt máy bật lại vẫn còn
-          localStorage.setItem('last_ai_cv_type', realType);
-          localStorage.setItem('last_ai_cv_id', String(realId));
+          // TRƯỜNG HỢP 2: Hệ thống báo đã hoàn thành xử lý ('completed')
+          if (response.data.status === 'completed') {
+            console.log("🎉 AI đã xử lý xong hoàn toàn! Tiến hành render...");
+            clearPreviousPolling(); // 🛑 Dừng vòng lặp hỏi thăm ngay lập tức
+
+            const mappedJobs = response.data.data.map(job => ({
+              ...job,
+              company: {
+                ...job.company,
+                name: job.company?.company_name || "Nhà tuyển dụng",
+                company_name: job.company?.company_name || "Nhà tuyển dụng"
+              },
+              location: job.location || "Toàn quốc",
+              salary: job.is_negotiable
+                ? "Thỏa thuận"
+                : `${(job.salary_min / 1000000).toFixed(0)}tr - ${(job.salary_max / 1000000).toFixed(0)}tr`,
+              logoBg: job.logo_bg || "bg-orange-600",
+              tags: job.skills ? job.skills.map(s => s.name) : [],
+              matchScore: Math.round(job.matching_score || 0),
+              aiReason: job.ai_reason || "Phù hợp với định hướng nghề nghiệp."
+            }));
+
+            setAiRecommendedJobs(mappedJobs);
+
+            const realType = response.data.analyzed_type;
+            const realId = response.data.analyzed_id;
+
+            if (realType && realId) {
+              setSelectedCv({ type: realType, id: String(realId) });
+              localStorage.setItem('last_ai_cv_type', realType);
+              localStorage.setItem('last_ai_cv_id', String(realId));
+            }
+
+            setLoading(false);
+          }
         }
-
+      } catch (error) {
+        if (axios.isCancel(error)) return;
+        console.error("Lỗi trong quá trình hỏi thăm AI:", error);
+        clearPreviousPolling(); // 🛑 Dừng vòng lặp khi gặp lỗi hệ thống
+        setErrorMsg(error.response?.data?.message || "Hệ thống AI gặp sự cố. Vui lòng thử lại!");
         setLoading(false);
       }
-    } catch (error) {
-      if (axios.isCancel(error)) return;
-      console.error("Lỗi AI gợi ý:", error);
-      setErrorMsg(error.response?.data?.message || "Hệ thống AI gặp sự cố. Vui lòng thử lại!");
-      setLoading(false);
+    };
+
+    // 🚀 Chạy kích hoạt lần đầu tiên ngay lập tức
+    await executeCheck();
+
+    // 🔁 Nếu sau lần đầu vẫn chưa xong (đang ở trạng thái loading), setup vòng lặp chạy mỗi 2 giây
+    if (pollingIntervalRef.current === null) {
+      pollingIntervalRef.current = setInterval(() => {
+        executeCheck();
+      }, 2000); // 2000ms = Hỏi thăm lại sau mỗi 2 giây
     }
   };
 
   useEffect(() => {
     if (isLoggedIn) {
       fetchUserCvList();
-      // Chạy với dữ liệu đã khôi phục từ localStorage (nếu có) hoặc chạy auto
       fetchAiRecommendations(selectedCv.type, selectedCv.id);
     } else {
       setLoading(false);
     }
+
+    // Unmount component: Hủy toàn bộ tiến trình mạng và vòng lặp chạy ẩn
     return () => {
       if (abortControllerRef.current) abortControllerRef.current.abort();
+      clearPreviousPolling();
     };
   }, [isLoggedIn]);
 
   // Khi người dùng chủ động chọn đổi CV khác trên giao diện
   const handleCvChange = (e) => {
-    const combinedValue = e.target.value; // Giá trị dạng "type_id"
+    const combinedValue = e.target.value;
     if (!combinedValue) return;
 
     const [type, cvId] = combinedValue.split('_');
 
     setSelectedCv({ type, id: cvId });
-    fetchAiRecommendations(type, cvId); // Gửi thẳng ID mới lên để BE bắt buộc phân tích cái mới
+    fetchAiRecommendations(type, cvId);
   };
 
   return (
@@ -144,14 +190,14 @@ export default function AiJobs() {
 
           <div className="flex items-center gap-4">
             <div className="p-3 rounded-2xl bg-gradient-to-tr from-orange-500 to-amber-500 text-white shadow-md">
-              <BrainCircuit size={28} className={loading ? "animate-spin" : ""} />
+              <BrainCircuit className={loading ? "animate-spin" : ""} size={28} />
             </div>
             <div>
               <h1 className="text-xl sm:text-2xl font-black uppercase bg-gradient-to-r from-orange-600 to-amber-600 bg-clip-text text-transparent">
                 Trung tâm Đề xuất Việc làm AI
               </h1>
               <p className="text-xs text-slate-500 mt-1">
-                Thuật toán bảo lưu trạng thái thông minh qua cơ chế Đồng bộ Định danh từ Client-side.
+                Ứng dụng cơ chế tính toán bất đồng bộ (Asynchronous Queue) triệt tiêu hoàn toàn độ trễ mạng.
               </p>
             </div>
           </div>
@@ -162,7 +208,6 @@ export default function AiJobs() {
             <div className="w-full">
               <label className="block text-[9px] uppercase font-bold text-slate-400">Nguồn phân tích</label>
               <select
-                // 🌟 ĐỒNG BỘ VALUE ĐỂ DROP DOWN LUÔN SÁNG ĐÚNG CV ĐANG XEM
                 value={selectedCv.type && selectedCv.id ? `${selectedCv.type}_${selectedCv.id}` : ''}
                 onChange={handleCvChange}
                 disabled={loading || !isLoggedIn}
@@ -174,7 +219,6 @@ export default function AiJobs() {
                   <option value="">✨ Đang xác định hồ sơ phù hợp...</option>
                 ) : (
                   userCvList.map((cv) => (
-                    // value kết hợp "type_cvId" để dễ cắt chuỗi xử lý
                     <option key={cv.id} value={`${cv.type}_${cv.cvId}`}>{cv.name}</option>
                   ))
                 )}
@@ -205,7 +249,7 @@ export default function AiJobs() {
             </div>
           )}
 
-          {loading ? (
+          {loading && aiRecommendedJobs.length === 0 ? (
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
               {[1, 2, 3].map((n) => (
                 <div key={n} className="bg-white p-5 rounded-2xl border border-slate-100 space-y-3 animate-pulse">

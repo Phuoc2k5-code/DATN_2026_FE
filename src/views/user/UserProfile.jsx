@@ -11,9 +11,9 @@ export default function UserProfile() {
   const [activeTab, setActiveTab] = useState('info');
   const [isEditing, setIsEditing] = useState(false);
   const [loading, setLoading] = useState(true);
-  const [hasProfile, setHasProfile] = useState(true); // 🚀 THÊM: State check xem đã tạo hồ sơ chưa
+  const [hasProfile, setHasProfile] = useState(true); 
 
-  // State thông tin người dùng (Mặc định để chế độ Khách nếu chưa đăng nhập)
+  // State thông tin người dùng 
   const [userInfo, setUserInfo] = useState({
     fullName: 'Tài khoản khách',
     email: 'Chưa đăng nhập',
@@ -59,21 +59,18 @@ export default function UserProfile() {
         if (response.data.success && response.data.data?.candidate) {
           const uData = response.data.data;
 
-          // SỬA DÒNG NÀY: Lấy birthday từ trong candidate ra để cắt chuỗi chuẩn ISO
           const rawBirthday = uData.candidate?.birthday || '';
           const formattedBirthday = rawBirthday ? rawBirthday.substring(0, 10) : '';
 
           const profileFetched = {
-            fullName: uData.candidate?.full_name || '',
+            // 🚀 ĐÃ SỬA: Ưu tiên lấy uData.name của bảng users, nếu null mới fallback về candidate.full_name
+            fullName: uData.name || uData.candidate?.full_name || '',
             email: uData.email || '',
             phone: uData.candidate?.phone || '',
             address: uData.candidate?.address || '',
             title: uData.candidate?.title || '',
-
-            // ĐỒNG BỘ CẢ 2: Gán chuỗi đã cắt đẹp đẽ "2002-11-20" vào cả dob lẫn birthday cho an toàn
             birthday: formattedBirthday,
             dob: formattedBirthday,
-
             avatar: uData.candidate?.avatar_url
               ? `http://127.0.0.1:8000/${uData.candidate.avatar_url}`
               : 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150'
@@ -89,13 +86,13 @@ export default function UserProfile() {
           setUserInfo(prev => ({
             ...prev,
             email: response.data.data?.email || 'Đã xác thực tài khoản',
-            fullName: 'Chưa cập nhật họ tên',
+            // 🚀 ĐÃ SỬA: Lấy tên tài khoản hiển thị ngay cả khi chưa tạo hồ sơ ứng viên
+            fullName: response.data.data?.name || 'Chưa cập nhật họ tên',
             title: 'Chưa có hồ sơ ứng viên'
           }));
         }
       } catch (error) {
         console.error("Lỗi lấy thông tin tài khoản:", error);
-        // Nếu backend trả về lỗi 404 hoặc lỗi không tìm thấy hồ sơ ứng viên tùy cấu hình API của bạn
         if (error.response?.status === 404) {
           setHasProfile(false);
         } else if (error.response?.status === 401) {
@@ -160,16 +157,28 @@ export default function UserProfile() {
 
       if (response.data.success) {
         alert(response.data.message);
-        if (response.data.data?.avatar_url) {
-          setUserInfo(prev => ({
-            ...prev,
-            avatar: `http://127.0.0.1:8000/${response.data.data.avatar_url}`
-          }));
-        }
-        setBackupUserInfo(userInfo);
+        
+        // Cập nhật lại State Frontend dựa vào dữ liệu phản hồi mới nhất từ Backend
+        setUserInfo(prev => ({
+          ...prev,
+          // 🚀 ĐÃ SỬA: Đồng bộ name mới cập nhật từ bảng users lên giao diện lập tức
+          fullName: response.data.data?.name || userInfo.fullName,
+          avatar: response.data.data?.avatar_url 
+            ? `http://127.0.0.1:8000/${response.data.data.avatar_url}`
+            : prev.avatar
+        }));
+
+        setBackupUserInfo({
+          ...userInfo,
+          fullName: response.data.data?.name || userInfo.fullName,
+          avatar: response.data.data?.avatar_url 
+            ? `http://127.0.0.1:8000/${response.data.data.avatar_url}`
+            : userInfo.avatar
+        });
+        
         setAvatarFile(null);
         setIsEditing(false);
-        setHasProfile(true); // Đã lưu thành công đồng nghĩa với việc đã có hồ sơ
+        setHasProfile(true); 
       }
     } catch (error) {
       console.error("Lỗi lưu hồ sơ:", error);
@@ -362,22 +371,23 @@ export default function UserProfile() {
                 {/* TAB 1: THÔNG TIN NGƯỜI DÙNG */}
                 {activeTab === 'info' && (
                   <>
-                    {/* 🚀 TRƯỜNG HỢP 2: ĐÃ ĐĂNG NHẬP NHƯNG CHƯA TẠO HỒ SƠ ỨNG VIÊN */}
+                    {/* TRƯỜNG HỢP 2: ĐÃ ĐĂNG NHẬP NHƯNG CHƯA TẠO HỒ SƠ ỨNG VIÊN */}
                     {!hasProfile ? (
                       <div className="py-12 flex flex-col items-center justify-center text-center max-w-sm mx-auto space-y-4">
                         <div className="w-16 h-16 rounded-full bg-rose-50 border border-rose-200 flex items-center justify-center text-rose-500 shadow-inner">
                           <FilePlus size={26} />
                         </div>
                         <div className="space-y-1">
-                          <h3 className="text-sm font-black text-slate-800 tracking-tight">Bạn chưa có hồ sơ ứng viên</h3>
+                          {/* 🚀 ĐÃ SỬA: Hiển thị lời chào cá nhân hóa kèm theo name của user kể cả khi chưa lập hồ sơ */}
+                          <h3 className="text-sm font-black text-slate-800 tracking-tight">Chào {userInfo.fullName}, bạn chưa có hồ sơ ứng viên</h3>
                           <p className="text-[11px] text-slate-400 leading-relaxed">
-                            Tài khoản của bạn chưa được khởi tạo hồ sơ cá nhân. Vui lòng kích hoạt kích hoạt biểu mẫu bằng cách nhấn nút dưới đây để bắt đầu tìm kiếm việc làm.
+                            Tài khoản của bạn chưa được khởi tạo hồ sơ cá nhân. Vui lòng kích hoạt biểu mẫu bằng cách nhấn nút dưới đây để bắt đầu tìm kiếm việc làm.
                           </p>
                         </div>
                         <button
                           type="button"
                           onClick={() => {
-                            navigate('/cv-management/create-cv') // Bật form lên kích hoạt chế độ điền luôn
+                            navigate('/cv-management/create-cv') 
                           }}
                           className="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl flex items-center gap-1.5 shadow-md hover:shadow-lg transition-all transform hover:-translate-y-0.5"
                         >

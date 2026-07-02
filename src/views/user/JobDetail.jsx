@@ -23,14 +23,14 @@ export default function JobDetail() {
   const [isOpenReport, setIsOpenReport] = useState(false);
   const [availableCVs, setAvailableCVs] = useState([]);
   const [loadingCV, setLoadingCV] = useState(false);
-  
+
   // 🚀 ĐÃ THAY ĐỔI: Chuyển từ boolean sang string để quản lý nhiều trạng thái
   // Giá trị có thể là: null, 'pending', 'viewed', 'interviewing', 'accepted', 'rejected'
   const [applicationStatus, setApplicationStatus] = useState(null);
   const hasTrackedClick = useRef(false);
   useEffect(() => {
     if (hasTrackedClick.current) return;
-  
+
     hasTrackedClick.current = true;
     // Ngay khi ứng viên vào xem tin, tự động gửi API đếm lượt click
     axios.post(`http://127.0.0.1:8000/api/jobs/${id}/click`)
@@ -49,10 +49,10 @@ export default function JobDetail() {
 
   // Hàm kích hoạt lấy danh sách CV khi click ứng tuyển
   const handleOpenApplyModal = async () => {
-    const token = localStorage.getItem('token'); 
+    const token = localStorage.getItem('token');
     if (!token) {
       alert("Chức năng này yêu cầu đăng nhập. Vui lòng đăng nhập tài khoản ứng viên để tiếp tục!");
-      setLoading(false);      
+      setLoading(false);
       return;
     }
     setLoadingCV(true);
@@ -148,27 +148,27 @@ export default function JobDetail() {
   };
 
   const handleSaveJob = async (e) => {
-      e.stopPropagation(); // Ngăn chặn hành vi lan truyền sự kiện click mở trang chi tiết
-      try {
-        // 1. Gọi API gửi lên Laravel (Sẽ chạy logic Toggle Thêm/Xóa)
-        const response = await toggleSaveJob(job.id);
-        
-        // 2. Nếu API thành công, tiến hành đảo ngược state hiển thị màu nút trên UI
-        setIsSaved(!isSaved); 
-        
-        if(onRemoveSuccess){
-          onRemoveSuccess(job.id);
-        }
-        // 3. (Tùy chọn) Hiển thị thông báo Toast hoặc Alert cho người dùng biết
-        // alert(response.message); 
-      } catch (error) {
-        console.error("Lỗi lưu bài viết:", error);
-        // Nếu Backend trả về mã lỗi 401 (Chưa đăng nhập), báo lỗi ngay để ko bị nhảy màu nút bừa bãi
-        alert("Vui lòng đăng nhập để thực hiện tính năng lưu tin!");
-      } finally {
-        setShowMenu(false); 
+    e.stopPropagation(); // Ngăn chặn hành vi lan truyền sự kiện click mở trang chi tiết
+    try {
+      // 1. Gọi API gửi lên Laravel (Sẽ chạy logic Toggle Thêm/Xóa)
+      const response = await toggleSaveJob(job.id);
+
+      // 2. Nếu API thành công, tiến hành đảo ngược state hiển thị màu nút trên UI
+      setIsSaved(!isSaved);
+
+      if (onRemoveSuccess) {
+        onRemoveSuccess(job.id);
       }
-    };
+      // 3. (Tùy chọn) Hiển thị thông báo Toast hoặc Alert cho người dùng biết
+      // alert(response.message); 
+    } catch (error) {
+      console.error("Lỗi lưu bài viết:", error);
+      // Nếu Backend trả về mã lỗi 401 (Chưa đăng nhập), báo lỗi ngay để ko bị nhảy màu nút bừa bãi
+      alert("Vui lòng đăng nhập để thực hiện tính năng lưu tin!");
+    } finally {
+      setShowMenu(false);
+    }
+  };
 
   // 🚀 ĐÃ THÊM: Hàm "bốc thuốc" giao diện động dựa theo từng trạng thái cụ thể
   const renderApplyButton = () => {
@@ -180,11 +180,68 @@ export default function JobDetail() {
       );
     }
 
+    if (jobData.status === 'blocked_by_report') {
+      return (
+        <div className="space-y-2 w-full">
+          <button 
+            disabled 
+            className="w-full py-3 bg-slate-400 text-white rounded-xl font-black text-xs uppercase tracking-wider flex items-center justify-center gap-2 cursor-not-allowed shadow-none"
+          >
+            <AlertTriangle size={14} /> Tin tuyển dụng đã dừng nhận hồ sơ
+          </button>
+          <div className="flex items-center gap-1 justify-center text-[11px] text-amber-600 font-medium text-center px-1">
+            <span>Tin đăng này hiện đang tạm dừng hiển thị hoặc bị khóa do vi phạm quy chế.</span>
+          </div>
+        </div>
+      );
+    }
+
+    if (jobData.status === 'closed') {
+      return (
+        <div className="space-y-2 w-full">
+          <button 
+            disabled 
+            className="w-full py-3 bg-slate-100 text-slate-500 border border-slate-200 rounded-xl font-black text-xs uppercase tracking-wider flex items-center justify-center gap-2 cursor-not-allowed shadow-none"
+          >
+            <XCircle size={14} /> Nhà tuyển dụng đã đóng tin
+          </button>
+          <p className="text-[11px] text-slate-500 text-center font-medium px-1">
+            Nhà tuyển dụng đã chủ động dừng nhận hồ sơ ứng tuyển cho vị trí này.
+          </p>
+        </div>
+      );
+    }
+
+    // --- TRƯỜNG HỢP 2: TIN TUYỂN DỤNG HẾT HẠN ---
+    if (jobData.expired_at) {
+      const expiryDate = new Date(jobData.expired_at);
+      const currentDate = new Date();
+      
+      // Đặt giờ về 0 để so sánh chính xác theo ngày
+      expiryDate.setHours(23, 59, 59, 999); 
+      
+      if (currentDate > expiryDate) {
+        return (
+          <div className="space-y-2 w-full">
+            <button 
+              disabled 
+              className="w-full py-3 bg-rose-100 text-rose-500 border border-rose-200 rounded-xl font-black text-xs uppercase tracking-wider flex items-center justify-center gap-2 cursor-not-allowed shadow-none"
+            >
+              <XCircle size={14} /> Đã hết hạn nộp hồ sơ
+            </button>
+            <p className="text-[11px] text-rose-500 text-center font-medium">
+              Vị trí này đã đóng cổng ứng tuyển từ ngày {expiryDate.toLocaleDateString('vi-VN')}.
+            </p>
+          </div>
+        );
+      }
+    }
+
     switch (applicationStatus) {
       case 'pending':
         return (
           <div className="space-y-2 w-full">
-            <button              
+            <button
               className="w-full py-3 bg-amber-500 hover:bg-amber-600 text-white rounded-xl font-black text-xs uppercase tracking-wider flex items-center justify-center gap-2 transition-all shadow-md hover:shadow-lg hover:-translate-y-0.5 active:translate-y-0"
             >
               <RefreshCw size={14} /> Hồ sơ đang chờ duyệt
@@ -285,7 +342,7 @@ export default function JobDetail() {
 
   return (
     <div className="min-h-screen bg-[#FFFDF9] font-sans text-slate-800 antialiased pb-16 w-full overflow-x-hidden">
-      
+
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-4">
         <button
           onClick={() => navigate(-1)}
@@ -321,8 +378,8 @@ export default function JobDetail() {
               type="button"
               onClick={handleSaveJob}
               className={`flex-1 md:flex-none justify-center px-4 py-2.5 rounded-xl border font-bold text-xs flex items-center gap-1.5 transition-all ${isSaved
-                  ? 'bg-amber-50 border-amber-200 text-amber-600 shadow-xs'
-                  : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50 hover:text-slate-800'
+                ? 'bg-amber-50 border-amber-200 text-amber-600 shadow-xs'
+                : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50 hover:text-slate-800'
                 }`}
             >
               <Bookmark size={14} className={isSaved ? 'fill-amber-500 text-amber-500' : 'text-slate-400'} />
@@ -436,7 +493,7 @@ export default function JobDetail() {
 
           <div className="space-y-5">
             <div className="bg-white border border-slate-200/80 rounded-2xl p-5 shadow-sm space-y-4">
-              
+
               {/* 🚀 ĐÃ THAY ĐỔI: Gọi hàm render nút động màu sắc bắt mắt ở đây */}
               {renderApplyButton()}
 
@@ -447,10 +504,10 @@ export default function JobDetail() {
                 jobTitle={jobData.title}
                 jobId={jobData.id}
                 availableCVs={availableCVs}
-                onApplySuccess={handleApplySuccess} 
+                onApplySuccess={handleApplySuccess}
                 onUploadNewCv={handleUploadNewCv}
               />
-              
+
               <div className="h-px bg-slate-100 my-1"></div>
 
               <div className="space-y-3.5 text-xs font-semibold text-slate-600">
@@ -472,9 +529,10 @@ export default function JobDetail() {
                 </div>
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2 text-slate-400 font-medium"><Calendar size={14} /> Hạn nộp hồ sơ</div>
-                  <div className="text-rose-600 font-bold">{jobData.expired_at || 'Đang cập nhật'}</div>
+                  <div className="text-rose-600 font-bold">
+                    {jobData.expired_at ? new Date(jobData.expired_at).toLocaleDateString('vi-VN') : 'Đang cập nhật'}                  </div>
+                  </div>
                 </div>
-              </div>
             </div>
 
             <div className="bg-white border border-slate-200/80 rounded-2xl p-5 shadow-sm space-y-3.5">

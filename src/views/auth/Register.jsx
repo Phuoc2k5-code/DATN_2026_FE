@@ -1,11 +1,13 @@
 import React, { useState } from 'react';
 import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
-import { Mail, Lock, ArrowRight, AlertCircle, UserCheck, ShieldCheck } from 'lucide-react';
+// Bổ sung thêm icon User cho trường Họ và tên
+import { Mail, Lock, ArrowRight, AlertCircle, UserCheck, ShieldCheck, User } from 'lucide-react';
 import AI_Nen from '../../assets/images/AI_Nen.png';
 
 export default function RegisterPage() {
   // Toàn bộ State quản lý dữ liệu Form
+  const [name, setName] = useState(''); // <--- THÊM STATE QUẢN LÝ TÊN
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [passwordConfirmation, setPasswordConfirmation] = useState('');
@@ -34,6 +36,7 @@ export default function RegisterPage() {
     setLoading(true);
 
     const registerData = { 
+      name, // <--- ĐÃ BỔ SUNG TRUYỀN NAME LÊN BACKEND LARAVEL
       email, 
       password, 
       password_confirmation: passwordConfirmation, 
@@ -167,6 +170,16 @@ export default function RegisterPage() {
                 </div>
 
                 <form onSubmit={handleRegister} className="space-y-4">
+                  
+                  {/* Ô nhập Họ và tên (BỚ CỤC MỚI BỔ SUNG) */}
+                  <div className="space-y-1">
+                    <label className="block text-left text-xs font-semibold text-slate-600">Họ và tên</label>
+                    <div className="flex items-center gap-2 px-3 py-2.5 border border-slate-200 rounded-xl bg-slate-50/50 focus-within:bg-white focus-within:border-blue-500 transition">
+                      <User size={16} className="text-slate-400" />
+                      <input required type="text" value={name} onChange={(e) => setName(e.target.value)} className="w-full bg-transparent outline-none text-sm text-slate-700" placeholder="Nguyễn Văn A" />
+                    </div>
+                  </div>
+
                   {/* Ô nhập Email */}
                   <div className="space-y-1">
                     <label className="block text-left text-xs font-semibold text-slate-600">Địa chỉ Email</label>

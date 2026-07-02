@@ -31,7 +31,7 @@ export default function Header() {
           const uData = response.data.data;
           
           setCurrentUser({
-            name: uData.candidate?.full_name || "Thành viên",
+            name: uData.name || "Thành viên",
             email: uData.email,
             avatar: uData.candidate?.avatar_url
               ? `http://127.0.0.1:8000/${uData.candidate.avatar_url}`

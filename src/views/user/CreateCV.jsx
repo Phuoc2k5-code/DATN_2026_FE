@@ -42,10 +42,11 @@ export default function CreateCV() {
   const [loading, setLoading] = useState(true);
   const [addingCategory, setAddingCategory] = useState(false); // Trạng thái loading khi bấm thêm category
   const [addingSkill, setAddingSkill] = useState(false);       // Trạng thái loading khi bấm thêm skill
-  const [showWarningModal, setShowWarningModal] = useState(false); 
+  const [showWarningModal, setShowWarningModal] = useState(false);
   const [skillSearch, setSkillSearch] = useState('');
   const [cvData, setCvData] = useState(INITIAL_EMPTY_FORM);
   const [avatarPreview, setAvatarPreview] = useState('');
+  const [errors, setErrors] = useState({}); // Lưu trữ lỗi từ backend để hiển thị trên form
 
   // Dữ liệu danh mục và kỹ năng lấy từ API hệ thống
   const [systemCategories, setSystemCategories] = useState([]);
@@ -54,11 +55,12 @@ export default function CreateCV() {
   // ================= TỰ ĐỘNG NẠP DỮ LIỆU KHI VÀO TRANG =================
   useEffect(() => {
     const initPageData = async () => {
+      const token = localStorage.getItem('token');
       if (!token) {
         alert("Chức năng này yêu cầu đăng nhập. Vui lòng đăng nhập tài khoản ứng viên để tiếp tục!");
-        return;
+        navigate('/');
       }
-      try {        
+      try {
         setLoading(true);
 
         // 1. Nạp danh mục và kỹ năng hệ thống trước phục vụ việc hiển thị form
@@ -156,7 +158,7 @@ export default function CreateCV() {
         setLoading(false);
       }
     };
-    
+
     initPageData();
   }, [id]);
 
@@ -218,7 +220,7 @@ export default function CreateCV() {
 
       if (res.data && res.data.success) {
         const newSkill = res.data.data;
-        
+
         // 1. Đưa kỹ năng mới vào bộ nhớ hệ thống chung
         setSystemSkills(prev => {
           if (prev.some(s => s.id === newSkill.id)) return prev;
@@ -304,7 +306,7 @@ export default function CreateCV() {
           });
           setAvatarPreview(defaultInfo.avatar_url ? `http://localhost:8000/${defaultInfo.avatar_url}` : '');
           alert("Mời bạn tiến hành điền hồ sơ mới từ đầu!");
-          window.location.reload(); 
+          window.location.reload();
         }
       } catch (err) {
         console.error(err);
@@ -322,7 +324,7 @@ export default function CreateCV() {
         full_name: prev.full_name, gender: prev.gender, birthday: prev.birthday ? prev.birthday.substring(0, 10) : '',
         email: prev.email, phone: prev.phone, address: prev.address, avatar: prev.avatar, avatar_url: prev.avatar_url,
         category_id: prev.category_id, category_name_input: prev.category_name_input, cv_template_id: prev.cv_template_id,
-        links: prev.links, contact_reference: prev.contact_reference 
+        links: prev.links, contact_reference: prev.contact_reference
       }));
       setSkillSearch('');
     }
@@ -437,8 +439,28 @@ export default function CreateCV() {
         navigate('/cv-management');
       }
     } catch (error) {
-      console.error(error);
-      alert("Lỗi hệ thống khi lưu, vui lòng kiểm tra lại dữ liệu!");
+      console.error("Error saving CV Profile:", error);
+
+      // 5. Xử lý lỗi trả về từ Laravel Validation (Thường là mã 422 Unprocessable Entity)
+      if (error.response && error.response.status === 422 && error.response.data.errors) {
+        const backendErrors = error.response.data.errors;
+        const formattedErrors = {};
+
+        // Chuyển đổi cấu trúc lỗi từ Laravel (mảng thông báo) thành chuỗi đơn lẻ để hiển thị trên UI React
+        Object.keys(backendErrors).forEach(key => {
+          formattedErrors[key] = backendErrors[key][0]; // Lấy câu thông báo lỗi đầu tiên của trường đó
+        });
+
+        if (typeof setErrors === 'function') {
+          setErrors(formattedErrors);
+        }
+
+        // Cuộn mượt lên trên để người dùng thấy hộp cảnh báo lỗi tổng quát
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      } else {
+        // Các trường hợp lỗi đường truyền, lỗi 500 mạng hỏng hoặc mất kết nối database
+        alert("Đã xảy ra lỗi hệ thống khi lưu dữ liệu. Vui lòng thử lại hoặc liên hệ quản trị viên!");
+      }
     }
   };
 
@@ -473,6 +495,17 @@ export default function CreateCV() {
             </button>
           </div>
 
+          {/* HỘP THÔNG BÁO TỔNG HỢP LỖI NẾU CÓ */}
+          {errors && Object.keys(errors).length > 0 && (
+            <div className="flex items-start gap-2.5 p-4 bg-rose-50 border border-rose-200 text-rose-700 rounded-2xl text-sm font-medium">
+              <ShieldAlert size={18} className="shrink-0 mt-0.5" />
+              <div>
+                <span className="font-bold">Thông tin chưa hợp lệ:</span>
+                <p className="text-xs text-rose-600/90 mt-0.5">Vui lòng kiểm tra lại các trường thông tin được đánh dấu lỗi màu đỏ ở phía dưới.</p>
+              </div>
+            </div>
+          )}
+
           <div className="space-y-6">
 
             {/* THÔNG TIN CÁ NHÂN & LIÊN HỆ */}
@@ -495,6 +528,8 @@ export default function CreateCV() {
                     <span>Chọn file ảnh mới</span>
                     <input type="file" accept="image/*" className="hidden" onChange={handleAvatarChange} />
                   </label>
+                  {/* Lỗi ảnh đại diện */}
+                  {errors?.avatar && <p className="text-xs text-rose-500 font-medium mt-2 text-center">{errors.avatar}</p>}
                 </div>
 
                 <div className="md:col-span-2 grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -509,8 +544,10 @@ export default function CreateCV() {
                       value={cvData.title || ''}
                       onChange={handleBaseChange}
                       placeholder="VD: Lập trình viên Fullstack / Chuyên viên Thiết kế đồ họa..."
-                      className="w-full px-3 py-2 bg-white border border-blue-200 focus:border-blue-500 rounded-xl text-sm font-semibold outline-none placeholder-slate-400 transition"
+                      className={`w-full px-3 py-2 bg-white border ${errors?.title ? 'border-rose-400 focus:border-rose-500 ring-1 ring-rose-100' : 'border-blue-200 focus:border-blue-500'} rounded-xl text-sm font-semibold outline-none placeholder-slate-400 transition`}
                     />
+                    {/* Gợi ý lỗi Tiêu đề */}
+                    {errors?.title && <p className="text-xs text-rose-500 font-medium mt-1 flex items-center gap-1"><span className="w-1 h-1 bg-rose-500 rounded-full"></span>{errors.title}</p>}
                   </div>
 
                   <div className="sm:col-span-2">
@@ -522,11 +559,12 @@ export default function CreateCV() {
                         <input
                           required
                           type="text"
+                          name="category_name_input"
                           list="categories-datalist"
                           value={cvData.category_name_input || ''}
                           onChange={handleCategoryInputChange}
                           placeholder="Chọn từ danh sách hoặc tự gõ ngành nghề mới..."
-                          className="w-full px-3 py-2 border rounded-xl text-sm bg-white outline-none focus:border-blue-500"
+                          className={`w-full px-3 py-2 border ${errors?.category_id ? 'border-rose-400 focus:border-rose-500' : 'border-slate-200 focus:border-blue-500'} rounded-xl text-sm bg-white outline-none`}
                         />
                         <datalist id="categories-datalist">
                           {systemCategories.map(cat => (
@@ -534,7 +572,7 @@ export default function CreateCV() {
                           ))}
                         </datalist>
                       </div>
-                      
+
                       {!cvData.category_id && cvData.category_name_input?.trim() && (
                         <button
                           type="button"
@@ -547,21 +585,53 @@ export default function CreateCV() {
                         </button>
                       )}
                     </div>
+                    {/* Gợi ý lỗi Danh mục */}
+                    {errors?.category_id && <p className="text-xs text-rose-500 font-medium mt-1 flex items-center gap-1"><span className="w-1 h-1 bg-rose-500 rounded-full"></span>{errors.category_id}</p>}
                   </div>
 
-                  <div><label className="block text-xs font-semibold text-slate-500 mb-1">Họ và tên *</label><input required type="text" name="full_name" value={cvData.full_name || ''} onChange={handleBaseChange} className="w-full px-3 py-2 border rounded-xl text-sm outline-none" /></div>
-                  <div><label className="block text-xs font-semibold text-slate-500 mb-1">Số điện thoại *</label><input required type="tel" name="phone" value={cvData.phone || ''} onChange={handleBaseChange} className="w-full px-3 py-2 border rounded-xl text-sm outline-none" /></div>
-                  <div><label className="block text-xs font-semibold text-slate-500 mb-1">Email *</label><input required type="email" name="email" value={cvData.email || ''} onChange={handleBaseChange} className="w-full px-3 py-2 border rounded-xl text-sm outline-none" /></div>
+                  {/* Họ và tên */}
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-500 mb-1">Họ và tên *</label>
+                    <input required type="text" name="full_name" value={cvData.full_name || ''} onChange={handleBaseChange} className={`w-full px-3 py-2 border ${errors?.full_name ? 'border-rose-400 focus:border-rose-500' : 'border-slate-200'} rounded-xl text-sm outline-none`} />
+                    {errors?.full_name && <p className="text-xs text-rose-500 font-medium mt-1">{errors.full_name}</p>}
+                  </div>
+
+                  {/* Số điện thoại */}
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-500 mb-1">Số điện thoại *</label>
+                    <input required type="tel" name="phone" value={cvData.phone || ''} onChange={handleBaseChange} className={`w-full px-3 py-2 border ${errors?.phone ? 'border-rose-400 focus:border-rose-500' : 'border-slate-200'} rounded-xl text-sm outline-none`} />
+                    {errors?.phone && <p className="text-xs text-rose-500 font-medium mt-1">{errors.phone}</p>}
+                  </div>
+
+                  {/* Email */}
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-500 mb-1">Email *</label>
+                    <input required type="email" name="email" value={cvData.email || ''} onChange={handleBaseChange} className={`w-full px-3 py-2 border ${errors?.email ? 'border-rose-400 focus:border-rose-500' : 'border-slate-200'} rounded-xl text-sm outline-none`} />
+                    {errors?.email && <p className="text-xs text-rose-500 font-medium mt-1">{errors.email}</p>}
+                  </div>
+
+                  {/* Giới tính & Ngày sinh */}
                   <div className="grid grid-cols-2 gap-2">
                     <div>
                       <label className="block text-xs font-semibold text-slate-500 mb-1">Giới tính</label>
                       <select name="gender" value={cvData.gender || 'Nam'} onChange={handleBaseChange} className="w-full px-3 py-2 border rounded-xl text-sm bg-white outline-none">
                         <option value="Nam">Nam</option><option value="Nữ">Nữ</option><option value="Khác">Khác</option>
                       </select>
+                      {errors?.gender && <p className="text-xs text-rose-500 font-medium mt-1">{errors.gender}</p>}
                     </div>
-                    <div><label className="block text-xs font-semibold text-slate-500 mb-1">Ngày sinh</label><input type="date" name="birthday" value={cvData.birthday || ''} onChange={handleBaseChange} className="w-full px-3 py-2 border rounded-xl text-sm outline-none" /></div>
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-500 mb-1">Ngày sinh</label>
+                      <input type="date" name="birthday" value={cvData.birthday || ''} onChange={handleBaseChange} className="w-full px-3 py-2 border rounded-xl text-sm outline-none" />
+                      {errors?.birthday && <p className="text-xs text-rose-500 font-medium mt-1">{errors.birthday}</p>}
+                    </div>
                   </div>
-                  <div className="sm:col-span-2"><label className="block text-xs font-semibold text-slate-500 mb-1">Địa chỉ cư trú</label><input type="text" name="address" value={cvData.address || ''} onChange={handleBaseChange} className="w-full px-3 py-2 border rounded-xl text-sm outline-none" /></div>
+
+                  {/* Địa chỉ */}
+                  <div className="sm:col-span-2">
+                    <label className="block text-xs font-semibold text-slate-500 mb-1">Địa chỉ cư trú</label>
+                    <input type="text" name="address" value={cvData.address || ''} onChange={handleBaseChange} className="w-full px-3 py-2 border rounded-xl text-sm outline-none" />
+                    {errors?.address && <p className="text-xs text-rose-500 font-medium mt-1">{errors.address}</p>}
+                  </div>
                 </div>
               </div>
             </div>
@@ -573,6 +643,7 @@ export default function CreateCV() {
                 <div className="space-y-3">
                   <div><label className="block text-xs font-semibold text-slate-500 mb-1">GitHub</label><input type="url" value={cvData.links?.github || ''} onChange={(e) => handleNestedChange('links', 'github', e.target.value)} className="w-full px-3 py-2 border rounded-xl text-sm outline-none" /></div>
                   <div><label className="block text-xs font-semibold text-slate-500 mb-1">LinkedIn</label><input type="url" value={cvData.links?.linkedin || ''} onChange={(e) => handleNestedChange('links', 'linkedin', e.target.value)} className="w-full px-3 py-2 border rounded-xl text-sm outline-none" /></div>
+                  {errors?.links && <p className="text-xs text-rose-500 font-medium mt-1">{errors.links}</p>}
                 </div>
               </div>
               <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100">
@@ -583,6 +654,7 @@ export default function CreateCV() {
                     <div><label className="block text-xs font-semibold text-slate-500 mb-1">Mối quan hệ</label><input type="text" value={cvData.contact_reference?.relationship || ''} onChange={(e) => handleNestedChange('contact_reference', 'relationship', e.target.value)} className="w-full px-3 py-2 border rounded-xl text-sm outline-none" /></div>
                   </div>
                   <div><label className="block text-xs font-semibold text-slate-500 mb-1">Điện thoại</label><input type="tel" value={cvData.contact_reference?.phone || ''} onChange={(e) => handleNestedChange('contact_reference', 'phone', e.target.value)} className="w-full px-3 py-2 border rounded-xl text-sm outline-none" /></div>
+                  {errors?.contact_reference && <p className="text-xs text-rose-500 font-medium mt-1">{errors.contact_reference}</p>}
                 </div>
               </div>
             </div>
@@ -590,19 +662,22 @@ export default function CreateCV() {
             {/* GIỚI THIỆU & MỤC TIÊU */}
             <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100 grid grid-cols-1 md:grid-cols-2 gap-6">
               <div>
-                <div className="flex items-center gap-2 pb-3 mb-3 border-b text-blue-600"><User size={18} /> <h3 className="font-bold text-slate-800 text-base">Giới thiệu bản thân</h3></div>
-                <textarea rows="4" name="summary" value={cvData.summary || ''} onChange={handleBaseChange} className="w-full px-3 py-2 border rounded-xl text-sm resize-none outline-none" />
+                <div className="flex items-center gap-2 pb-3 mb-3 border-b text-blue-600"><User size={18} /> <h3 className="font-bold text-slate-800 text-base">Giới thiệu bản thân *</h3></div>
+                <textarea required rows="4" name="summary" value={cvData.summary || ''} onChange={handleBaseChange} className={`w-full px-3 py-2 border ${errors?.summary ? 'border-rose-400 focus:border-rose-500' : 'border-slate-200'} rounded-xl text-sm resize-none outline-none`} placeholder="Tóm tắt ngắn gọn về kinh nghiệm, thế mạnh bản thân..." />
+                {errors?.summary && <p className="text-xs text-rose-500 font-medium mt-1">{errors.summary}</p>}
               </div>
               <div>
                 <div className="flex items-center gap-2 pb-3 mb-3 border-b text-emerald-600"><Target size={18} /> <h3 className="font-bold text-slate-800 text-base">Mục tiêu nghề nghiệp</h3></div>
-                <textarea rows="4" name="objective" value={cvData.objective || ''} onChange={handleBaseChange} className="w-full px-3 py-2 border rounded-xl text-sm resize-none outline-none" />
+                <textarea rows="4" name="objective" value={cvData.objective || ''} onChange={handleBaseChange} className={`w-full px-3 py-2 border ${errors?.objective ? 'border-rose-400 focus:border-rose-500' : 'border-slate-200'} rounded-xl text-sm resize-none outline-none`} placeholder="Mục tiêu ngắn hạn và dài hạn trong sự nghiệp..." />
+                {errors?.objective && <p className="text-xs text-rose-500 font-medium mt-1">{errors.objective}</p>}
               </div>
             </div>
 
             {/* HỌC VẤN */}
             <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100">
               <div className="flex items-center gap-2.5 pb-3 mb-3 border-b text-sky-600"><GraduationCap size={20} /><h2 className="text-base font-bold text-slate-800">Trình độ học vấn</h2></div>
-              <textarea rows="4" name="education" value={cvData.education || ''} onChange={handleBaseChange} className="w-full px-3 py-2 border rounded-xl text-sm resize-none outline-none" />
+              <textarea rows="4" name="education" value={cvData.education || ''} onChange={handleBaseChange} className={`w-full px-3 py-2 border ${errors?.education ? 'border-rose-400 focus:border-rose-500' : 'border-slate-200'} rounded-xl text-sm resize-none outline-none`} placeholder="Thông tin trường học, ngành học, chứng chỉ..." />
+              {errors?.education && <p className="text-xs text-rose-500 font-medium mt-1">{errors.education}</p>}
             </div>
 
             {/* DỰ ÁN THỰC TẾ */}
@@ -614,6 +689,9 @@ export default function CreateCV() {
                   <input type="number" min="0" name="experience_years" value={cvData.experience_years || 0} onChange={handleBaseChange} className="w-16 px-2 py-1 border rounded-lg text-sm text-center outline-none" />
                 </div>
               </div>
+              {errors?.experience_years && <p className="text-xs text-rose-500 font-medium">{errors.experience_years}</p>}
+              {errors?.project && <p className="text-xs text-rose-500 font-medium">{errors.project}</p>}
+
               <div className="space-y-6 max-h-[480px] overflow-y-auto pr-2">
                 {(cvData.project || []).map((item, index) => (
                   <div key={index} className="p-4 rounded-xl bg-slate-50/80 border border-slate-200 relative space-y-3">
@@ -639,15 +717,19 @@ export default function CreateCV() {
             <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100 space-y-4">
               <div className="flex items-center gap-2.5 pb-3 border-b border-slate-100">
                 <div className="p-2 bg-purple-50 text-purple-600 rounded-lg"><Code size={20} /></div>
-                <h2 className="text-lg font-bold text-slate-800">Kỹ năng Chuyên môn & Cấp độ</h2>
+                <h2 className="text-lg font-bold text-slate-800">Kỹ năng Chuyên môn & Cặp độ *</h2>
               </div>
+
+              {/* Cảnh báo lỗi kĩ năng chung */}
+              {errors?.skills && <p className="text-xs text-rose-500 font-bold p-2 bg-rose-50 rounded-lg flex items-center gap-1.5"><ShieldAlert size={14} /> {errors.skills}</p>}
+
               <div className="space-y-1.5 relative">
                 <span className="text-xs font-bold text-blue-600 block">Bước 1: Tìm kiếm kỹ năng</span>
                 <div className="flex items-center border border-slate-200 rounded-xl px-3 py-2 bg-slate-50/50 focus-within:bg-white transition gap-2">
                   <Search size={16} className="text-slate-400" />
                   <input type="text" value={skillSearch} onChange={(e) => setSkillSearch(e.target.value)} placeholder="Nhập tên kỹ năng..." className="w-full bg-transparent outline-none text-sm text-slate-700" />
                 </div>
-                
+
                 {/* MENU GỢI Ý SKILLS */}
                 {skillSearch.trim() !== '' && (
                   <div className="absolute left-0 right-0 mt-1 bg-white border border-slate-200 rounded-xl shadow-lg z-10 max-h-56 overflow-y-auto divide-y">
@@ -678,7 +760,7 @@ export default function CreateCV() {
                   </div>
                 )}
               </div>
-              
+
               <div className="space-y-2 pt-2">
                 <span className="text-xs font-bold text-slate-500 block">Bước 2: Chọn cấp độ cho kỹ năng</span>
                 {cvData.skills && cvData.skills.length > 0 ? (
@@ -696,7 +778,7 @@ export default function CreateCV() {
                     ))}
                   </div>
                 ) : (
-                  <div className="text-center py-6 border border-dashed rounded-xl bg-slate-50/50"><p className="text-xs text-slate-400 italic">Chưa có kỹ năng nào được chọn.</p></div>
+                  <div className="text-center py-6 border border-dashed rounded-xl bg-slate-50/50"><p className="text-xs text-slate-400 italic">Chưa có kỹ năng nào được chọn (Bắt buộc).</p></div>
                 )}
               </div>
             </div>
@@ -713,8 +795,7 @@ export default function CreateCV() {
               <RotateCcw size={18} /> Làm mới form
             </button>
 
-            <button type="submit" className={`inline-flex items-center gap-2 text-white px-6 py-2.5 rounded-xl font-semibold text-sm shadow transition ${mode === 'edit' ? 'bg-amber-600 hover:bg-amber-700' : 'bg-blue-600 hover:bg-blue-700'
-              }`}>
+            <button type="submit" className={`inline-flex items-center gap-2 text-white px-6 py-2.5 rounded-xl font-semibold text-sm shadow transition ${mode === 'edit' ? 'bg-amber-600 hover:bg-amber-700' : 'bg-blue-600 hover:bg-blue-700'}`}>
               <Save size={18} /> {mode === 'edit' ? "Cập nhật hồ sơ" : "Lưu hồ sơ mới"}
             </button>
           </div>
