@@ -3,7 +3,7 @@ import axios from 'axios';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { 
   Building2, FileText, Globe, AlignLeft, 
-  Briefcase, Users, Calendar, MapPin, Gift, AlertCircle, Upload
+  Briefcase, Users, Calendar, MapPin, Gift, AlertCircle, Upload, Image as ImageIcon
 } from 'lucide-react';
 
 export default function CreateCompanyPage() {
@@ -13,11 +13,10 @@ export default function CreateCompanyPage() {
   // Lấy email ẩn được truyền từ trang đăng ký / OTP qua state của react-router-dom
   const userEmail = location.state?.email || '';
 
-  // Quản lý dữ liệu Form dựa theo cấu trúc bảng companies
+  // Quản lý dữ liệu Form văn bản (Đã loại bỏ business_license ra khỏi đây)
   const [formData, setFormData] = useState({
     company_name: '',
     tax_code: '',
-    business_license: '',
     website_url: '',
     industry: '',
     size: '',
@@ -27,16 +26,19 @@ export default function CreateCompanyPage() {
     benefits: ''
   });
 
-  // State quản lý file thực tế và link xem trước hình ảnh (Preview)
+  // State quản lý file Logo và link xem trước
   const [logoFile, setLogoFile] = useState(null);
-  // Sử dụng đường dẫn logo mặc định từ Laravel public làm giá trị ban đầu
   const [logoPreview, setLogoPreview] = useState('http://127.0.0.1:8000/logoCompany/logo-default.png');
+
+  // 🚀 STATE MỚI: Quản lý file ảnh Giấy phép kinh doanh và link xem trước
+  const [licenseFile, setLicenseFile] = useState(null);
+  const [licensePreview, setLicensePreview] = useState('');
 
   // Quản lý trạng thái UI
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
-  // Bảo vệ Route: Nếu không có email (truy cập lụi), đá người dùng về trang đăng ký
+  // Bảo vệ Route
   useEffect(() => {
     if (!userEmail) {
       alert('Không tìm thấy thông tin đăng ký tài khoản. Vui lòng đăng ký lại.');
@@ -53,24 +55,39 @@ export default function CreateCompanyPage() {
     }));
   };
 
-  // Hàm xử lý chọn ảnh logo và tạo link preview tạm thời
-  const handleFileChange = (e) => {
+  // Hàm xử lý chọn ảnh logo
+  const handleLogoChange = (e) => {
     const file = e.target.files[0];
     if (file) {
-      // Kiểm tra định dạng nhanh phía Client
       if (!file.type.match('image.*')) {
-        setError('Vui lòng chỉ chọn file hình ảnh (png, jpg, jpeg...).');
+        setError('Vui lòng chỉ chọn file hình ảnh cho Logo (png, jpg, jpeg...).');
         return;
       }
-      // Kiểm tra dung lượng file (2MB = 2048 * 1024 bytes)
       if (file.size > 2 * 1024 * 1024) {
         setError('Dung lượng ảnh logo không được vượt quá 2MB.');
         return;
       }
-
       setError('');
       setLogoFile(file);
-      setLogoPreview(URL.createObjectURL(file)); // Tạo Blob URL hiển thị tức thì trên giao diện
+      setLogoPreview(URL.createObjectURL(file));
+    }
+  };
+
+  // 🚀 HÀM MỚI: Xử lý chọn ảnh Giấy phép kinh doanh
+  const handleLicenseChange = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      if (!file.type.match('image.*')) {
+        setError('Vui lòng chỉ chọn file hình ảnh cho Giấy phép kinh doanh (png, jpg, jpeg...).');
+        return;
+      }
+      if (file.size > 4 * 1024 * 1024) { // Cho phép ảnh GPKD tối đa 4MB vì cần độ nét cao
+        setError('Dung lượng ảnh Giấy phép kinh doanh không được vượt quá 4MB.');
+        return;
+      }
+      setError('');
+      setLicenseFile(file);
+      setLicensePreview(URL.createObjectURL(file));
     }
   };
 
@@ -78,9 +95,15 @@ export default function CreateCompanyPage() {
   const handleSubmit = (e) => {
     e.preventDefault();
     setError('');
+
+    // Bắt buộc kiểm tra xem đã upload ảnh GPKD chưa (Nếu backend của bạn yêu cầu trường này)
+    if (!licenseFile) {
+      setError('Vui lòng tải lên ảnh Giấy phép kinh doanh để xác thực doanh nghiệp.');
+      return;
+    }
+
     setLoading(true);
 
-    // BẮT BUỘC: Tạo đối tượng FormData để có thể truyền file lẫn văn bản lên Laravel cùng lúc
     const dataToSend = new FormData();
     
     // 1. Đưa thông tin tài khoản liên kết vào
@@ -91,15 +114,19 @@ export default function CreateCompanyPage() {
       dataToSend.append(key, formData[key]);
     });
 
-    // 3. Nếu người dùng chọn file mới, đính kèm file đó vào FormData, ngược lại backend tự lấy ảnh mặc định
+    // 3. Đính kèm file ảnh Logo (nếu có)
     if (logoFile) {
       dataToSend.append('logo', logoFile);
     }
 
-    // Gửi yêu cầu post tới API theo cấu trúc của hai bạn
+    // 4. 🚀 Đính kèm file ảnh Giấy phép kinh doanh vào trường business_license
+    if (licenseFile) {
+      dataToSend.append('business_license', licenseFile);
+    }
+
     axios.post('http://127.0.0.1:8000/api/companies/register', dataToSend, {
       headers: {
-        'Content-Type': 'multipart/form-data', // Bắt buộc đổi header sang loại này khi có File
+        'Content-Type': 'multipart/form-data',
         'Accept': 'application/json'
       }
     })
@@ -107,13 +134,12 @@ export default function CreateCompanyPage() {
       setLoading(false);
       if (response.data.success) {
         alert('Tạo hồ sơ công ty thành công! Vui lòng tiến hành đăng nhập vào hệ thống.');
-        navigate('/login'); // Chuyển hướng sang trang đăng nhập chính thức
+        navigate('/login');
       }
     })
     .catch(err => {
       setLoading(false);
       if (err.response && err.response.data) {
-        // Nếu backend trả về lỗi validate cụ thể từng trường
         if (err.response.data.errors) {
           const firstError = Object.values(err.response.data.errors)[0][0];
           setError(firstError);
@@ -141,7 +167,6 @@ export default function CreateCompanyPage() {
           </p>
         </div>
 
-        {/* Hiển thị lỗi động nếu có */}
         {error && (
           <div className="flex items-center gap-2 p-4 mb-6 bg-rose-50 border border-rose-200 text-rose-700 rounded-xl text-xs font-medium">
             <AlertCircle size={16} className="shrink-0" />
@@ -149,7 +174,6 @@ export default function CreateCompanyPage() {
           </div>
         )}
 
-        {/* Form nhập liệu */}
         <form onSubmit={handleSubmit} className="space-y-6">
 
           {/* KHU VỰC UPLOAD LOGO VÀ XEM TRƯỚC */}
@@ -170,7 +194,7 @@ export default function CreateCompanyPage() {
               id="logo-upload"
               type="file" 
               accept="image/*"
-              onChange={handleFileChange}
+              onChange={handleLogoChange}
               className="hidden" 
             />
             
@@ -199,19 +223,45 @@ export default function CreateCompanyPage() {
             </div>
           </div>
 
-          {/* Nhóm 2: Giấy phép kinh doanh & Website */}
+          {/* Nhóm 2: GIẤY PHÉP KINH DOANH (DẠNG ẢNH) & WEBSITE */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            
+            {/* 🚀 THAY ĐỔI: Giao diện chọn ảnh Giấy phép kinh doanh */}
             <div className="space-y-1">
-              <label className="block text-left text-xs font-semibold text-slate-600">Số GPKD / Giấy phép liên quan</label>
-              <div className="flex items-center gap-2 px-3 py-2.5 border border-slate-200 rounded-xl bg-slate-50/50 focus-within:bg-white focus-within:border-blue-500 transition">
-                <FileText size={16} className="text-slate-400" />
-                <input type="text" name="business_license" value={formData.business_license} onChange={handleChange} className="w-full bg-transparent outline-none text-sm text-slate-700" placeholder="GPKD-9999" />
+              <label className="block text-left text-xs font-semibold text-slate-600">Giấy phép kinh doanh (Bản ảnh) <span className="text-rose-500">*</span></label>
+              <div className="flex items-center gap-3 p-2 border border-slate-200 rounded-xl bg-slate-50/50 focus-within:bg-white transition h-[46px]">
+                <input 
+                  id="license-upload"
+                  type="file" 
+                  accept="image/*"
+                  onChange={handleLicenseChange}
+                  className="hidden" 
+                />
+                <label htmlFor="license-upload" className="px-2.5 py-1 bg-white border border-slate-200 rounded-lg text-xs font-semibold text-slate-600 cursor-pointer shadow-sm hover:bg-slate-50 flex items-center gap-1 shrink-0">
+                  <Upload size={14} /> Tải ảnh lên
+                </label>
+                <div className="text-xs text-slate-500 truncate flex items-center gap-1 w-full">
+                  {licenseFile ? (
+                    <span className="text-emerald-600 font-medium truncate flex items-center gap-1">
+                      <ImageIcon size={14} /> {licenseFile.name}
+                    </span>
+                  ) : (
+                    'Chưa chọn tệp ảnh GPKD...'
+                  )}
+                </div>
               </div>
+              
+              {/* Vùng hiển thị xem trước thu nhỏ của GPKD nếu đã chọn file */}
+              {licensePreview && (
+                <div className="mt-2 p-2 bg-slate-100 rounded-lg border border-slate-200 flex items-center justify-center max-h-[140px] overflow-hidden">
+                  <img src={licensePreview} alt="License Preview" className="max-h-[120px] rounded object-contain shadow-sm bg-white" />
+                </div>
+              )}
             </div>
 
             <div className="space-y-1">
               <label className="block text-left text-xs font-semibold text-slate-600">Đường dẫn Website</label>
-              <div className="flex items-center gap-2 px-3 py-2.5 border border-slate-200 rounded-xl bg-slate-50/50 focus-within:bg-white focus-within:border-blue-500 transition">
+              <div className="flex items-center gap-2 px-3 py-2.5 border border-slate-200 rounded-xl bg-slate-50/50 focus-within:bg-white focus-within:border-blue-500 transition grid-disabled-alignment">
                 <Globe size={16} className="text-slate-400" />
                 <input type="url" name="website_url" value={formData.website_url} onChange={handleChange} className="w-full bg-transparent outline-none text-sm text-slate-700" placeholder="https://company.com" />
               </div>
