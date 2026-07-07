@@ -197,7 +197,7 @@ export default function AiJobs() {
                 Trung tâm Đề xuất Việc làm AI
               </h1>
               <p className="text-xs text-slate-500 mt-1">
-                Ứng dụng cơ chế tính toán bất đồng bộ (Asynchronous Queue) triệt tiêu hoàn toàn độ trễ mạng.
+                Ứng dụng AI phân tích hồ sơ của bạn và đề xuất các công việc phù hợp nhất.
               </p>
             </div>
           </div>

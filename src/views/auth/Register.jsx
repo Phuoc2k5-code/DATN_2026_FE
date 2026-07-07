@@ -36,7 +36,7 @@ export default function RegisterPage() {
     setLoading(true);
 
     const registerData = { 
-      name, // <--- ĐÃ BỔ SUNG TRUYỀN NAME LÊN BACKEND LARAVEL
+      name,
       email, 
       password, 
       password_confirmation: passwordConfirmation, 
