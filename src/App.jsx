@@ -36,16 +36,17 @@ import SystemModeration from './views/admin/SystemModeration';
 import EmployerPage from './views/employer/EmployerPage';
 import EmployerProfile from './views/employer/EmployerProfile';
 import CreateCompanyPage from './views/employer/CreateCompanyPage'
+import ProtectedRoute from './components/ProtectedRoute';
 
 function App() {
   return (
-    <>    
+    <>
       <BrowserRouter>
-        <Routes>          
+        <Routes>
           <Route path="/login" element={<LoginPage />} />
-          <Route path='/register' element={<RegisterPage/>}/>
-          <Route path='/forgot-password' element={<ForgotPasswordPage/>} />
-          <Route path='/create-company' element={<CreateCompanyPage/>} />
+          <Route path='/register' element={<RegisterPage />} />
+          <Route path='/forgot-password' element={<ForgotPasswordPage />} />
+          <Route path='/create-company' element={<CreateCompanyPage />} />
           <Route element={<Layout />}>
             <Route path="/" element={<HomePage />} />
             <Route path="/jobs/:id" element={<JobDetail />} />
@@ -59,17 +60,19 @@ function App() {
             <Route path="/cv-management/edit-cv/:id" element={<UpdateCV />} />
             <Route path="/cv-management/preview-cv/:id" element={<CVPreviewAndTemplate />} />
           </Route>
-          <Route path="/employer" element={<EmployerPage />} />
-          <Route path="/employer/profile" element={<EmployerProfile />} />
-          <Route path="/admin/login" element={<AdminLoginPage />} />
-          <Route element={<LayoutAdmin/>}>
+          <Route element={<ProtectedRoute allowedRoles={['employer']} />}>
+            <Route path="/employer" element={<EmployerPage />} />
+            <Route path="/employer/profile" element={<EmployerProfile />} />
+            <Route path="/admin/login" element={<AdminLoginPage />} />
+          </Route>
+          <Route element={<LayoutAdmin />}>
             <Route path="/admin/dashboard" element={<AdminDashboard />} />
             <Route path="/admin/reports" element={<ReportManagement />} />
             <Route path="/admin/users" element={<UserManagement />} />
             <Route path="/admin/cv-templates" element={<CVTemplateManagement />} />
             <Route path="/admin/categories" element={<CategoryManagement />} />
             <Route path="/admin/statistics" element={<StatisticalReport />} />
-           <Route path="/admin/moderation" element={<SystemModeration />} />
+            <Route path="/admin/moderation" element={<SystemModeration />} />
           </Route>
         </Routes>
       </BrowserRouter>

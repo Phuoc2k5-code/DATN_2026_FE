@@ -162,13 +162,13 @@ export default function EmployerPage() {
         }
     };
     const handleToggleJobStatus = async (jobId, currentStatus) => {
-        // Nếu tin đang chờ duyệt thì không cho bấm
+        // 1. Chặn ngay ở Frontend nếu đang chờ duyệt (Rất tốt, giảm tải cho server)
         if (currentStatus === "Chờ duyệt") {
             alert("Tin tuyển dụng này đang chờ Admin phê duyệt, bạn chưa thể thao tác!");
             return;
         }
 
-        const confirmMessage = currentStatus === "Vận hành"
+        const confirmMessage = currentStatus === "Vận hành" // Hoặc 'active' tùy cách bạn map dữ liệu
             ? "Bạn có chắc chắn muốn ĐÓNG tin tuyển dụng này không?"
             : "Bạn có chắc chắn muốn MỞ LẠI tin tuyển dụng này không?";
 
@@ -181,14 +181,21 @@ export default function EmployerPage() {
             });
 
             if (response.data.success) {
-                // Cập nhật thành công -> Gọi lại hàm tải danh sách để làm mới giao diện ngay lập tức
+                // Cập nhật thành công -> Gọi lại hàm tải danh sách
                 loadEmployerJobs();
-            } else {
-                alert(response.data.message);
+                
+                // Bạn có thể bật thêm dòng này để hiện thông báo Thành công từ Laravel
+                // alert(response.data.message); 
             }
         } catch (err) {
             console.error("Lỗi cập nhật trạng thái:", err);
-            alert("Có lỗi xảy ra khi cập nhật! Vui lòng thử lại sau.");
+            
+            // 2. SỬA CHỖ NÀY: Bóc tách thông báo lỗi từ Laravel
+            if (err.response && err.response.data && err.response.data.message) {
+                alert(err.response.data.message); // In ra "Tin này đã bị Admin từ chối..."
+            } else {
+                alert("Có lỗi xảy ra khi cập nhật! Vui lòng thử lại sau."); // Lớp dự phòng khi đứt cáp, mất mạng
+            }
         }
     };
     const handleCreateJob = async (e) => {
