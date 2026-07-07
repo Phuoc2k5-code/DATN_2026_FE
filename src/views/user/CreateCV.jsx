@@ -58,7 +58,7 @@ export default function CreateCV() {
       const token = localStorage.getItem('token');
       if (!token) {
         alert("Chức năng này yêu cầu đăng nhập. Vui lòng đăng nhập tài khoản ứng viên để tiếp tục!");
-        navigate('/');
+        return navigate('/');
       }
       try {
         setLoading(true);
@@ -704,7 +704,7 @@ export default function CreateCV() {
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                       <div><label className="block text-[11px] font-semibold text-slate-500 mb-1">Tên dự án *</label><input required type="text" value={item.project_name || ''} onChange={(e) => handleProjectChange(index, 'project_name', e.target.value)} className="w-full px-3 py-2 bg-white border rounded-lg text-sm outline-none" /></div>
                       <div><label className="block text-[11px] font-semibold text-slate-500 mb-1">Vai trò *</label><input required type="text" value={item.role || ''} onChange={(e) => handleProjectChange(index, 'role', e.target.value)} className="w-full px-3 py-2 bg-white border rounded-lg text-sm outline-none" /></div>
-                      <div><label className="block text-[11px] font-semibold text-slate-500 mb-1">Thời gian *</label><input required type="text" value={item.duration || ''} onChange={(e) => handleProjectChange(index, 'duration', e.target.value)} className="w-full px-3 py-2 bg-white border rounded-lg text-sm outline-none" /></div>
+                      <div><label className="block text-[11px] font-semibold text-slate-500 mb-1">Thời gian(tháng) *</label><input required type="text" value={item.duration || ''} onChange={(e) => handleProjectChange(index, 'duration', e.target.value)} className="w-full px-3 py-2 bg-white border rounded-lg text-sm outline-none" /></div>
                     </div>
                     <div><label className="block text-[11px] font-semibold text-slate-500 mb-1">Mô tả chi tiết *</label><textarea required rows="3" value={item.description || ''} onChange={(e) => handleProjectChange(index, 'description', e.target.value)} className="w-full px-3 py-1.5 bg-white border rounded-lg text-xs resize-none outline-none" /></div>
                   </div>

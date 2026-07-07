@@ -10,9 +10,11 @@ import {
   User,
   FileText,
   CheckCircle,
-  ChevronLeft, // Icon cho nút chuyển trang trước
-  ChevronRight // Icon cho nút chuyển trang sau
+  ChevronLeft,
+  ChevronRight
 } from 'lucide-react';
+import axios from 'axios';
+import AdminApprovalModal from '../../components/AdminApproveModal';
 
 export default function ReportManagement() {
   const [reports, setReports] = useState([]);
@@ -27,19 +29,27 @@ export default function ReportManagement() {
   const [currentPage, setCurrentPage] = useState(1);
   const [lastPage, setLastPage] = useState(1);
 
-  // STATE QUẢN LÝ MODAL CHI TIẾT
+  // STATE QUẢN LÝ MODAL HỒ SƠ VI PHẠM (XEM LỊCH SỬ)
   const [selectedReport, setSelectedReport] = useState(null);
   const [loadingDetail, setLoadingDetail] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
 
+  // STATE CẤU HÌNH CHO MODAL DUYỆT GỐC MỚI
+  const [approveModalConfig, setApproveModalConfig] = useState({
+    isOpen: false,
+    type: 'job',
+    data: null,
+    reportId: null // Lưu kèm ID báo cáo để truyền vào hàm kỷ luật/bác bỏ
+  });
+
   const API_BASE_URL = 'http://127.0.0.1:8000/api/admin';
   const token = localStorage.getItem('token');
 
-  // ================= 1. HÀM FETCH DANH SÁCH BÁO CÁO (ĐÃ THÊM PAGE) =================
+  // ================= 1. HÀM FETCH DANH SÁCH BÁO CÁO =================
   const fetchReports = (pageNumber = 1) => {
     setLoading(true);
     const queryParams = new URLSearchParams();
-    queryParams.append('page', pageNumber); // Truyền số trang lên Server
+    queryParams.append('page', pageNumber);
     if (statusFilter !== 'all') queryParams.append('status', statusFilter);
     if (typeFilter !== 'all') queryParams.append('type', typeFilter);
 
@@ -57,7 +67,6 @@ export default function ReportManagement() {
       .then(res => {
         if (res.success) {
           setReports(res.data);
-          // Đồng bộ dữ liệu phân trang từ Server Laravel đổ về
           if (res.pagination) {
             setCurrentPage(res.pagination.current_page);
             setLastPage(res.pagination.last_page);
@@ -72,31 +81,69 @@ export default function ReportManagement() {
       });
   };
 
-  // Tự động kích hoạt gọi API khi người dùng thay đổi bộ lọc hoặc đổi trang
   useEffect(() => {
     fetchReports(currentPage);
   }, [statusFilter, typeFilter, currentPage]);
 
-  // Hàm thay đổi filter loại đối tượng (Auto reset về trang 1 để tránh lỗi lệch trang)
   const handleTypeFilterChange = (type) => {
     setTypeFilter(type);
     setCurrentPage(1);
   };
 
-  // Hàm thay đổi filter trạng thái xử lý (Auto reset về trang 1)
   const handleStatusFilterChange = (status) => {
     setStatusFilter(status);
     setCurrentPage(1);
   };
 
-  // Hàm xử lý nhấn nút chuyển trang Prev / Next
   const handlePageChange = (newPage) => {
     if (newPage >= 1 && newPage <= lastPage) {
       setCurrentPage(newPage);
     }
   };
 
-  // ================= 2. HÀM FETCH CHI TIẾT ĐỂ MỞ MODAL =================
+  // ================= HÀM AXIOS FETCH CHI TIẾT ĐỐI TƯỢNG GỐC ĐỂ MỞ MODAL =================
+  const handleViewTargetDetail = async (report) => {
+    const isJob = !!report.job_id;
+    const targetId = report.job_id || report.company_id;
+
+    if (!targetId) {
+      alert('Không tìm thấy ID của đối tượng này!');
+      return;
+    }
+
+    const fetchUrl = isJob 
+      ? `http://127.0.0.1:8000/api/job-detail/${targetId}`
+      : `http://127.0.0.1:8000/api/companies/${targetId}`;
+
+    try {
+      const response = await axios.get(fetchUrl, {
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        }
+      });
+
+      const res = response.data; 
+
+      if (res.success) {
+        setApproveModalConfig({
+          isOpen: true,
+          type: isJob ? 'job' : 'company',
+          data: res.data,
+          reportId: report.id // Lưu lại ID báo cáo phục vụ cho việc Bác bỏ / Kỷ luật
+        });
+      } else {
+        alert(res.message || 'Tải dữ liệu thất bại.');
+      }
+
+    } catch (err) {
+      console.error('Lỗi Axios:', err);
+      const errorMsg = err.response?.data?.message || 'Có lỗi xảy ra khi kết nối đến hệ thống.';
+      alert(errorMsg);
+    }
+  };
+
+  // ================= 2. HÀM FETCH CHI TIẾT HỒ SƠ BÁO CÁO CŨ =================
   const handleShowDetail = (id) => {
     setLoadingDetail(true);
     setIsModalOpen(true);
@@ -126,7 +173,7 @@ export default function ReportManagement() {
       });
   };
 
-  // ================= 3. HÀM XỬ LÝ BÁC BỎ BÁO CÁO =================
+  // ================= 3. HÀM XỬ LÝ BÁC BỎ BÁO CÁO (ĐỒNG BỘ ĐÓNG MODAL) =================
   const handleReject = (id) => {
     if (window.confirm('Bạn có chắc chắn muốn bác bỏ báo cáo này?')) {
       fetch(`${API_BASE_URL}/reports/${id}/dismiss`, {
@@ -141,12 +188,14 @@ export default function ReportManagement() {
         .then(data => {
           if (data.success) {
             setReports(reports.map(r => r.id === id ? { ...r, status: 'dismissed' } : r));
+            // Đóng modal duyệt gốc nếu đang mở
+            setApproveModalConfig({ isOpen: false, type: 'job', data: null, reportId: null });
           }
         });
     }
   };
 
-  // ================= 4. HÀM XỬ LÝ KỶ LUẬT =================
+  // ================= 4. HÀM XỬ LÝ KỶ LUẬT (ĐỒNG BỘ ĐÓNG MODAL) =================
   const handleDiscipline = (id) => {
     const note = window.prompt('Nhập lý do / ghi chú kỷ luật:', 'Vi phạm tiêu chuẩn đăng tin tuyển dụng.');
     if (note !== null) {
@@ -163,6 +212,8 @@ export default function ReportManagement() {
           if (data.success) {
             alert(data.message);
             setReports(reports.map(r => r.id === id ? { ...r, status: 'resolved' } : r));
+            // Đóng modal duyệt gốc nếu đang mở
+            setApproveModalConfig({ isOpen: false, type: 'job', data: null, reportId: null });
           }
         });
     }
@@ -239,19 +290,22 @@ export default function ReportManagement() {
                         {report.user?.username || report.user?.name || 'Ẩn danh'}
                         <div className="text-xs text-slate-400 font-normal mt-0.5">{report.user?.email}</div>
                       </td>
-                      <td className="px-6 py-4">
+                      
+                      {/* CLICK VÀO ĐỂ XEM CHI TIẾT BÀI ĐĂNG GỐC */}
+                      <td className="px-6 py-4 cursor-pointer hover:bg-slate-100/50 transition-colors" onClick={() => handleViewTargetDetail(report)}>
                         {report.job_id ? (
                           <>
-                            <div className="font-semibold text-slate-800 truncate max-w-[180px]">{report.job?.title}</div>
-                            <div className="text-xs text-blue-600 bg-blue-50 border border-blue-100 inline-block px-1.5 py-0.5 rounded mt-1 font-medium">Tin tuyển dụng</div>
+                            <div className="font-semibold text-slate-800 hover:text-blue-600 transition-colors truncate max-w-[180px]">{report.job?.title}</div>
+                            <div className="text-xs text-blue-600 bg-blue-50 border border-blue-100 inline-block px-1.5 py-0.5 rounded mt-1 font-medium">Tin tuyển dụng 🔍</div>
                           </>
                         ) : (
                           <>
-                            <div className="font-semibold text-slate-800 truncate max-w-[180px]">{report.company?.company_name}</div>
-                            <div className="text-xs text-purple-600 bg-purple-50 border border-purple-100 inline-block px-1.5 py-0.5 rounded mt-1 font-medium">Doanh nghiệp</div>
+                            <div className="font-semibold text-slate-800 hover:text-purple-600 transition-colors truncate max-w-[180px]">{report.company?.company_name}</div>
+                            <div className="text-xs text-purple-600 bg-purple-50 border border-purple-100 inline-block px-1.5 py-0.5 rounded mt-1 font-medium">Doanh nghiệp 🔍</div>
                           </>
                         )}
                       </td>
+
                       <td className="px-6 py-4">
                         {reportsCount >= 10 ? (
                           <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-bold bg-red-50 text-red-700 border border-red-200 animate-pulse">
@@ -265,7 +319,6 @@ export default function ReportManagement() {
                       </td>
                       <td className="px-6 py-4">
                         <div className="text-red-600/80 font-semibold">{report.reason_type}</div>
-                        {/* 🚀 ĐÃ SỬA: Bỏ truncate, thêm break-words và whitespace-pre-line để tự động xuống dòng đầy đủ */}
                         <div className="text-xs text-slate-500 mt-0.5 break-words whitespace-pre-line">
                           {report.description || 'Không có mô tả chi tiết'}
                         </div>
@@ -300,7 +353,7 @@ export default function ReportManagement() {
           </table>
         </div>
 
-        {/* ================= THANH BẤM PHÂN TRANG (MỚI THÊM) ================= */}
+        {/* Thanh Phân Trang */}
         {!loading && lastPage > 1 && (
           <div className="px-6 py-4 bg-slate-50 border-t border-slate-200 flex items-center justify-between">
             <div className="text-sm text-slate-500">
@@ -330,12 +383,11 @@ export default function ReportManagement() {
         )}
       </div>
 
-      {/* ======================= COMPONENT MODAL CHI TIẾT ======================= */}
+      {/* ======================= COMPONENT 1: MODAL LỊCH SỬ HỒ SƠ CŨ ======================= */}
       {isModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-sm p-4 animate-fade-in">
           <div className="bg-white w-full max-w-xl rounded-2xl shadow-xl border border-slate-100 overflow-hidden flex flex-col max-h-[90vh]">
 
-            {/* Modal Header */}
             <div className="px-6 py-4 bg-slate-50 border-b border-slate-100 flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <FileText className="h-5 w-5 text-blue-600" />
@@ -349,7 +401,6 @@ export default function ReportManagement() {
               </button>
             </div>
 
-            {/* Modal Body */}
             <div className="p-6 overflow-y-auto space-y-5 flex-1">
               {loadingDetail ? (
                 <div className="py-12 text-center text-slate-400">
@@ -409,7 +460,6 @@ export default function ReportManagement() {
               )}
             </div>
 
-            {/* Modal Footer */}
             <div className="px-6 py-4 bg-slate-50 border-t border-slate-100 flex justify-end">
               <button
                 onClick={() => { setIsModalOpen(false); setSelectedReport(null); }}
@@ -422,6 +472,16 @@ export default function ReportManagement() {
           </div>
         </div>
       )}
+
+      {/* ======================= COMPONENT 2: MODAL XEM NỘI DUNG GỐC ĐỂ PHÂN XỬ ======================= */}
+      <AdminApprovalModal
+        isOpen={approveModalConfig.isOpen}
+        type={approveModalConfig.type}
+        data={approveModalConfig.data}
+        onClose={() => setApproveModalConfig({ isOpen: false, type: 'job', data: null, reportId: null })}
+        onReject={() => handleReject(approveModalConfig.reportId)}
+        onApprove={() => handleDiscipline(approveModalConfig.reportId)}
+      />
 
     </div>
   );

@@ -186,9 +186,9 @@ export default function CVPreviewAndTemplate() {
               <ArrowLeft size={16} className="text-slate-500 group-hover:-translate-x-0.5 transition-transform" />
             </Link>
             <div>
-              <h1 className="text-base font-extrabold text-slate-800 flex items-center gap-2">
-                <Layout size={18} className="text-orange-500" />
-                Giao diện Chọn Mẫu CV
+              <h1 className="text-lg font-bold text-slate-800 flex items-center gap-2.5 pb-2 border-b border-slate-100">
+                <Layout size={20} className="text-orange-500 shrink-0" />
+                <span>Giao diện Chọn Mẫu CV</span>
               </h1>
               <p className="text-[11px] text-slate-400 font-medium">Lựa chọn phong cách hiển thị hồ sơ cá nhân của bạn chuyên nghiệp nhất</p>
             </div>

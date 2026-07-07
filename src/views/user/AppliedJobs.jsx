@@ -279,7 +279,7 @@ export default function AppliedJobs() {
                               </span>
                               <span className="text-[11px] text-slate-600 font-bold mt-1 truncate max-w-full block group-hover/cv:text-rose-600 group-hover/cv:underline" title={item.cv_file?.file_name}>
                                 {/* Tài liệu đính kèm.pdf */}
-                                {item.cv_file.file_path}
+                                {item.cv_file?.file_path}
                               </span>
                             </>
                           )}
