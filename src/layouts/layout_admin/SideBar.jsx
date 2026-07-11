@@ -29,7 +29,7 @@ export default function SideBar() {
   const handleLogout = () => {
     // 1. Xóa sạch mọi dấu vết lưu trữ ở Local và Session Storage
     localStorage.removeItem('token');
-    localStorage.removeItem('user_info');
+    localStorage.removeItem('user');
     sessionStorage.clear(); // Xóa sạch bộ nhớ phiên làm việc
 
     // Nếu bạn có API đăng xuất bên Laravel, có thể gọi fetch ở đây trước khi xóa token:

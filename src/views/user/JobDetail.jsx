@@ -284,6 +284,8 @@ export default function JobDetail() {
         return (
           <div className="space-y-2 w-full">
             <button
+              type="button"
+              onClick={handleOpenApplyModal}
               className="w-full py-3 bg-rose-600 hover:bg-rose-700 text-white rounded-xl font-black text-xs uppercase tracking-wider flex items-center justify-center gap-2 transition-all shadow-md hover:shadow-lg hover:-translate-y-0.5 active:translate-y-0"
             >
               <Send size={14} /> Hồ sơ chưa phù hợp

@@ -88,25 +88,36 @@ export default function AiJobs() {
         if (response.data && response.data.success) {
           // TRƯỜNG HỢP 1: Hệ thống báo hàng đợi vẫn đang xử lý ('processing')
           if (response.data.status === 'processing') {
-    console.log("⏳ AI vẫn đang tính toán ngầm dưới Backend...");
-    return; 
-  }
+            console.log("⏳ AI vẫn đang tính toán ngầm dưới Backend...");
+            return;
+          }
 
-  // 🔥 THÊM TRƯỜNG HỢP NÀY: Nếu Backend báo 'failed', dập tắt Polling ngay lập tức!
-  if (response.data.status === 'failed') {
-    console.log("🛑 Hệ thống báo lỗi từ hàng đợi.");
-    clearPreviousPolling(); // Dừng vòng lặp hỏi thăm
-    setErrorMsg("AI xử lý quá hạn hoặc gặp sự cố. Vui lòng thử lại sau!");
-    setLoading(false);
-    return;
-  }
+          // 🔥 THÊM TRƯỜNG HỢP NÀY: Nếu Backend báo 'failed', dập tắt Polling ngay lập tức!
+          if (response.data.status === 'failed') {
+            console.log("🛑 Hệ thống báo lỗi từ hàng đợi.");
+            clearPreviousPolling(); // Dừng vòng lặp hỏi thăm
+            setErrorMsg("AI xử lý quá hạn hoặc gặp sự cố. Vui lòng thử lại sau!");
+            setLoading(false);
+            return;
+          }
 
           // TRƯỜNG HỢP 2: Hệ thống báo đã hoàn thành xử lý ('completed')
           if (response.data.status === 'completed') {
             console.log("🎉 AI đã xử lý xong hoàn toàn! Tiến hành render...");
             clearPreviousPolling(); // 🛑 Dừng vòng lặp hỏi thăm ngay lập tức
 
-            const mappedJobs = response.data.data.map(job => ({
+            const rawJobs = response.data.data || [];
+
+            // 🔥 Kiểm tra nếu danh sách việc làm trống
+            if (rawJobs.length === 0) {
+              console.log("📭 Không tìm thấy việc làm nào phù hợp.");
+              setAiRecommendedJobs([]); // Xóa danh sách cũ nếu có
+              setErrorMsg("Hiện tại chưa có việc làm nào thực sự phù hợp với CV của bạn. Hãy thử cập nhật thêm kỹ năng nhé!");
+              setLoading(false);
+              return;
+            }
+
+            const mappedJobs = rawJobs.map(job => ({
               ...job,
               company: {
                 ...job.company,

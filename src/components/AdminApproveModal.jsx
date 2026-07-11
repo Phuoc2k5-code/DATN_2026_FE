@@ -3,6 +3,14 @@ import { X, Building2, Briefcase, Calendar, DollarSign, MapPin, Layers, ShieldCh
 
 export default function AdminViolationDetailModal({ isOpen, onClose, type, data, onApprove, onReject }) {
   if (!isOpen || !data) return null;
+  const BACKEND_URL = 'http://127.0.0.1:8000';
+
+  const getLicenseUrl = (licensePath) => {
+    if (!licensePath) return null;
+    if (licensePath.startsWith('http')) return licensePath;
+    const path = licensePath.startsWith('/') ? licensePath : `/${licensePath}`;
+    return `${BACKEND_URL}${path}`;
+  };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 overflow-y-auto">
@@ -111,7 +119,7 @@ export default function AdminViolationDetailModal({ isOpen, onClose, type, data,
                 {data.business_license ? (
                   <div className="p-3 bg-slate-50 border border-slate-200 rounded-lg flex items-center justify-between">
                     <span className="text-xs text-slate-600 font-mono truncate max-w-[70%]">{data.business_license}</span>
-                    <a href={data.business_license} target="_blank" rel="noreferrer" className="px-3 py-1 bg-slate-200 text-slate-700 font-medium text-xs rounded hover:bg-slate-300 transition-colors shrink-0">Xem trực tiếp</a>
+                    <a href={getLicenseUrl(data.business_license)} target="_blank" rel="noreferrer" className="px-3 py-1 bg-slate-200 text-slate-700 font-medium text-xs rounded hover:bg-slate-300 transition-colors shrink-0">Xem trực tiếp</a>
                   </div>
                 ) : (
                   <p className="text-xs text-rose-500 font-medium bg-rose-50 border border-rose-100 p-2.5 rounded-lg">Doanh nghiệp chưa tải lên tệp đính kèm Giấy phép đăng ký kinh doanh!</p>

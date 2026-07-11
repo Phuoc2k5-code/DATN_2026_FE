@@ -292,8 +292,8 @@ export default function AppliedJobs() {
                           <span className="text-[10px] font-bold text-slate-400 bg-slate-100 px-2.5 py-1 rounded-lg cursor-default">Chờ phản hồi</span>
                         ) : (
                           <button
-                            type="button"
-                            onClick={() => setSelectedApply(item)} 
+                            //type="button"
+                            //onClick={() => setSelectedApply(item)} 
                             className={`inline-flex items-center gap-1 px-3 py-1.5 text-[10.5px] font-bold rounded-xl border shadow-2xs transition-all active:scale-95 cursor-pointer ${
                               ['interviewing', 'accepted'].includes(item.status)
                                 ? 'bg-emerald-600 border-emerald-600 text-white hover:bg-emerald-700'

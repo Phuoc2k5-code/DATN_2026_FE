@@ -220,7 +220,7 @@ export default function AdminDashboard() {
             <h3 className="text-lg font-bold text-slate-800">Tin tuyển dụng chờ duyệt mới nhất</h3>
             <p className="text-xs text-slate-400 mt-0.5">Danh sách các tin đăng doanh nghiệp gửi lên cần duyệt thẩm định nhanh</p>
           </div>
-          <a href="#" className="text-sm font-semibold text-blue-600 hover:text-blue-700">Xem tất cả &rarr;</a>
+          <a href="/admin/moderation" className="text-sm font-semibold text-blue-600 hover:text-blue-700">Xem tất cả &rarr;</a>
         </div>
         
         <div className="overflow-x-auto">

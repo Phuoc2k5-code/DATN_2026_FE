@@ -47,6 +47,8 @@ function App() {
           <Route path='/register' element={<RegisterPage />} />
           <Route path='/forgot-password' element={<ForgotPasswordPage />} />
           <Route path='/create-company' element={<CreateCompanyPage />} />
+          <Route path="/admin/login" element={<AdminLoginPage />} />
+          
           <Route element={<Layout />}>
             <Route path="/" element={<HomePage />} />
             <Route path="/jobs/:id" element={<JobDetail />} />
@@ -63,7 +65,6 @@ function App() {
           <Route element={<ProtectedRoute allowedRoles={['employer']} />}>
             <Route path="/employer" element={<EmployerPage />} />
             <Route path="/employer/profile" element={<EmployerProfile />} />
-            <Route path="/admin/login" element={<AdminLoginPage />} />
           </Route>
           <Route element={<LayoutAdmin />}>
             <Route path="/admin/dashboard" element={<AdminDashboard />} />

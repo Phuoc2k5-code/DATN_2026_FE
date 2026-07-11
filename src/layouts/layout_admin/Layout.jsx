@@ -5,13 +5,14 @@ import Sidebar from './Sidebar';
 import Footer from './Footer';
 export default function Layout () {
   // 1. Lấy thông tin user từ localStorage
+  const token = localStorage.getItem('token');
   const user = JSON.parse(localStorage.getItem('user')); 
 
   // 2. Kiểm tra xem có phải admin không
   const isAdmin = user && user.role === 'admin';
 
   // 3. Nếu KHÔNG PHẢI admin -> Đá văng về trang login ngay lập tức, không chạy code bên dưới
-  if (!isAdmin) {
+  if (!token || !isAdmin) {
     return <Navigate to="/admin/login" replace />;
   }
   return (

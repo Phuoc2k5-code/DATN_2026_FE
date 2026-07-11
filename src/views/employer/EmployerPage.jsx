@@ -1117,14 +1117,14 @@ export default function EmployerPage() {
                                                     value={candidate.status}
                                                     onChange={(e) => handleStatusChange(candidate.id, e.target.value)}
                                                     className={`w-full sm:w-36 px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-wider cursor-pointer outline-none text-center transition-colors
-                                                    ${candidate.status === "Chờ duyệt" ? "bg-amber-100 text-amber-800 hover:bg-amber-200" :
-                                                            candidate.status === "Phỏng vấn" ? "bg-blue-100 text-blue-800 hover:bg-blue-200" :
-                                                                candidate.status === "Nhận việc" ? "bg-emerald-100 text-emerald-800 hover:bg-emerald-200" :
+                                                    ${candidate.status === "pending" ? "bg-amber-100 text-amber-800 hover:bg-amber-200" :
+                                                            candidate.status === "interviewing" ? "bg-blue-100 text-blue-800 hover:bg-blue-200" :
+                                                                candidate.status === "accepted" ? "bg-emerald-100 text-emerald-800 hover:bg-emerald-200" :
                                                                     "bg-rose-100 text-rose-800 hover:bg-rose-200"}`}>
-                                                    <option value="Chờ duyệt">CHỜ DUYỆT</option>
-                                                    <option value="Phỏng vấn">PHỎNG VẤN</option>
-                                                    <option value="Nhận việc">NHẬN VIỆC</option>
-                                                    <option value="Từ chối">TỪ CHỐI</option>
+                                                    <option value="pending">CHỜ DUYỆT</option>
+                                                    <option value="interviewing">PHỎNG VẤN</option>
+                                                    <option value="accepted">NHẬN VIỆC</option>
+                                                    <option value="rejected">TỪ CHỐI</option>
                                                 </select>
                                             </div>
 
