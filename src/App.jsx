@@ -63,8 +63,8 @@ function App() {
           <Route element={<ProtectedRoute allowedRoles={['employer']} />}>
             <Route path="/employer" element={<EmployerPage />} />
             <Route path="/employer/profile" element={<EmployerProfile />} />
-            <Route path="/admin/login" element={<AdminLoginPage />} />
           </Route>
+           <Route path="/admin/login" element={<AdminLoginPage />} />
           <Route element={<LayoutAdmin />}>
             <Route path="/admin/dashboard" element={<AdminDashboard />} />
             <Route path="/admin/reports" element={<ReportManagement />} />
