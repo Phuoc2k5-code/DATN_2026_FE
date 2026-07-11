@@ -1,24 +1,31 @@
 import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
-import { useParams, Link as RouterLink, useNavigate } from 'react-router-dom';
+// 🚀 ĐÃ CẬP NHẬT: Thêm useLocation vào dòng import bên dưới
+import { useParams, Link as RouterLink, useNavigate, useLocation } from 'react-router-dom';
 import {
   MapPin, Briefcase, DollarSign, Calendar, Clock,
   UserCheck, Building2, Send, CheckCircle, ChevronRight,
   AlertCircle, AlertTriangle, Bookmark, Loader2, RefreshCw,
   Eye, CalendarDays, XCircle
 } from 'lucide-react';
-import { toggleSaveJob } from '../../utils/api'
+import { toggleSaveJob } from '../../utils/api';
 import ApplyModal from '../../components/ApplyModal';
 import ReportModal from '../../components/ReportModal';
 
 export default function JobDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
+  // 🚀 ĐÃ THÊM: Định nghĩa biến location để hứng state từ ngoài truyền vào
+  const location = useLocation();
 
   const [jobData, setJobData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [isSaved, setIsSaved] = useState(false);
+
+  // 🚀 ĐÃ THAY ĐỔI: Ưu tiên nhận trạng thái lưu tin thực tế gửi từ JobCard qua
+  const isSavedFromCard = location.state?.textIsSaved;
+  const [isSaved, setIsSaved] = useState(isSavedFromCard !== undefined ? isSavedFromCard : false);
+  
   const [isOpenApply, setIsOpenApply] = useState(false);
   const [isOpenReport, setIsOpenReport] = useState(false);
   const [availableCVs, setAvailableCVs] = useState([]);
@@ -28,6 +35,7 @@ export default function JobDetail() {
   // Giá trị có thể là: null, 'pending', 'viewed', 'interviewing', 'accepted', 'rejected'
   const [applicationStatus, setApplicationStatus] = useState(null);
   const hasTrackedClick = useRef(false);
+  
   useEffect(() => {
     if (hasTrackedClick.current) return;
 
@@ -41,6 +49,13 @@ export default function JobDetail() {
         console.error("Không thể ghi nhận lượt tương tác click", error);
       });
   }, [id]);
+
+  // 🚀 ĐÃ THAY ĐỔI: Chỉ đồng bộ lại từ API khi đi trực tiếp (F5) chứ không đè lên trạng thái của JobCard
+  useEffect(() => {
+    if (jobData && isSavedFromCard === undefined) {
+      setIsSaved(!!jobData?.is_saved);
+    }
+  }, [jobData?.id, jobData?.is_saved, isSavedFromCard]);
 
   // hàm xem danh sách có cập nhật hay ko
   const handleUploadNewCv = (newCv) => {
@@ -151,23 +166,17 @@ export default function JobDetail() {
     e.stopPropagation(); // Ngăn chặn hành vi lan truyền sự kiện click mở trang chi tiết
     try {
       // 1. Gọi API gửi lên Laravel (Sẽ chạy logic Toggle Thêm/Xóa)
-      const response = await toggleSaveJob(job.id);
+      const response = await toggleSaveJob(jobData.id);
 
       // 2. Nếu API thành công, tiến hành đảo ngược state hiển thị màu nút trên UI
       setIsSaved(!isSaved);
-
-      if (onRemoveSuccess) {
-        onRemoveSuccess(job.id);
-      }
       // 3. (Tùy chọn) Hiển thị thông báo Toast hoặc Alert cho người dùng biết
       // alert(response.message); 
     } catch (error) {
       console.error("Lỗi lưu bài viết:", error);
       // Nếu Backend trả về mã lỗi 401 (Chưa đăng nhập), báo lỗi ngay để ko bị nhảy màu nút bừa bãi
       alert("Vui lòng đăng nhập để thực hiện tính năng lưu tin!");
-    } finally {
-      setShowMenu(false);
-    }
+    } 
   };
 
   // 🚀 ĐÃ THÊM: Hàm "bốc thuốc" giao diện động dựa theo từng trạng thái cụ thể

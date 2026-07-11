@@ -183,13 +183,13 @@ export default function EmployerPage() {
             if (response.data.success) {
                 // Cập nhật thành công -> Gọi lại hàm tải danh sách
                 loadEmployerJobs();
-                
+
                 // Bạn có thể bật thêm dòng này để hiện thông báo Thành công từ Laravel
                 // alert(response.data.message); 
             }
         } catch (err) {
             console.error("Lỗi cập nhật trạng thái:", err);
-            
+
             // 2. SỬA CHỖ NÀY: Bóc tách thông báo lỗi từ Laravel
             if (err.response && err.response.data && err.response.data.message) {
                 alert(err.response.data.message); // In ra "Tin này đã bị Admin từ chối..."
@@ -1063,12 +1063,15 @@ export default function EmployerPage() {
                                                 <h3 className="text-sm font-black text-slate-900 hover:text-orange-500 transition-colors cursor-pointer">
                                                     {candidate.name}
                                                 </h3>
-                                                <span className={`text-[9px] font-black px-2 py-0.5 rounded uppercase tracking-wider ${candidate.status === "Chờ duyệt" ? "bg-amber-100 text-amber-800" :
-                                                    candidate.status === "Phỏng vấn" ? "bg-blue-100 text-blue-800" :
-                                                        candidate.status === "Nhận việc" ? "bg-emerald-100 text-emerald-800" :
-                                                            "bg-rose-100 text-rose-800"
+                                                <span className={`text-[9px] font-black px-2 py-0.5 rounded uppercase tracking-wider ${candidate.status === "pending" ? "bg-amber-100 text-amber-800" :
+                                                        candidate.status === "interviewing" ? "bg-blue-100 text-blue-800" :
+                                                            candidate.status === "accepted" ? "bg-emerald-100 text-emerald-800" :
+                                                                "bg-rose-100 text-rose-800" // Mặc định cho 'rejected' hoặc các trạng thái lỗi khác
                                                     }`}>
-                                                    {candidate.status}
+                                                    {candidate.status === "pending" ? "Chờ duyệt" :
+                                                        candidate.status === "interviewing" ? "Phỏng vấn" :
+                                                            candidate.status === "accepted" ? "Nhận việc" :
+                                                                candidate.status === "rejected" ? "Từ chối" : candidate.status}
                                                 </span>
                                                 <span className="text-[10px] text-slate-400 font-mono ml-auto sm:ml-0">{candidate.timeApplied}</span>
                                             </div>

@@ -51,122 +51,141 @@ export default function AiJobs() {
   };
 
   // 🔥 HÀM GỌI API MỚI: Tích hợp Polling thông minh, triệt tiêu lỗi Timeout 30s
-  const fetchAiRecommendations = async (type = '', id = '') => {
-    if (!isLoggedIn) {
-      setLoading(false);
-      return;
-    }
+const fetchAiRecommendations = async (type = '', id = '') => {
+  if (!isLoggedIn) {
+    setLoading(false);
+    return;
+  }
 
-    // Hủy kết nối request cũ nếu người dùng thao tác quá nhanh
-    if (abortControllerRef.current) {
-      abortControllerRef.current.abort();
-    }
-    abortControllerRef.current = new AbortController();
+  // 1. 🛑 DỌN DẸP TUYỆT ĐỐI các vòng lặp Polling trước đó trước khi làm việc với AbortController
+  if (pollingIntervalRef.current) {
+    clearInterval(pollingIntervalRef.current);
+    pollingIntervalRef.current = null; // Bắt buộc phải đưa về null
+  }
 
-    // Dọn dẹp các vòng lặp Polling trước đó để kích hoạt luồng quét mới
-    clearPreviousPolling();
+  // 2. Hủy kết nối request cũ nếu người dùng thao tác quá nhanh
+  if (abortControllerRef.current) {
+    abortControllerRef.current.abort();
+  }
+  abortControllerRef.current = new AbortController();
 
-    setLoading(true);
-    setErrorMsg(null);
+  setLoading(true);
+  setErrorMsg(null);
 
-    // Định nghĩa hàm thực thi một vòng lặp kiểm tra
-    const executeCheck = async () => {
-      try {
-        const response = await axios.get('http://localhost:8000/api/ai-recomment', {
-          params: {
-            type: type || null,
-            id: id || null,
-            _t: new Date().getTime()
-          },
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Accept': 'application/json'
-          },
-          signal: abortControllerRef.current.signal
-        });
+  // Định nghĩa hàm thực thi một vòng lặp kiểm tra
+  const executeCheck = async () => {
+    try {
+      const response = await axios.get('http://localhost:8000/api/ai-recomment', {
+        params: {
+          type: type || null,
+          id: id || null,
+          _t: new Date().getTime()
+        },
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Accept': 'application/json'
+        },
+        // Sử dụng signal hiện tại của lượt gọi này
+        signal: abortControllerRef.current?.signal 
+      });
 
-        if (response.data && response.data.success) {
-          // TRƯỜNG HỢP 1: Hệ thống báo hàng đợi vẫn đang xử lý ('processing')
-          if (response.data.status === 'processing') {
-            console.log("⏳ AI vẫn đang tính toán ngầm dưới Backend...");
-            return;
-          }
-
-          // 🔥 THÊM TRƯỜNG HỢP NÀY: Nếu Backend báo 'failed', dập tắt Polling ngay lập tức!
-          if (response.data.status === 'failed') {
-            console.log("🛑 Hệ thống báo lỗi từ hàng đợi.");
-            clearPreviousPolling(); // Dừng vòng lặp hỏi thăm
-            setErrorMsg("AI xử lý quá hạn hoặc gặp sự cố. Vui lòng thử lại sau!");
-            setLoading(false);
-            return;
-          }
-
-          // TRƯỜNG HỢP 2: Hệ thống báo đã hoàn thành xử lý ('completed')
-          if (response.data.status === 'completed') {
-            console.log("🎉 AI đã xử lý xong hoàn toàn! Tiến hành render...");
-            clearPreviousPolling(); // 🛑 Dừng vòng lặp hỏi thăm ngay lập tức
-
-            const rawJobs = response.data.data || [];
-
-            // 🔥 Kiểm tra nếu danh sách việc làm trống
-            if (rawJobs.length === 0) {
-              console.log("📭 Không tìm thấy việc làm nào phù hợp.");
-              setAiRecommendedJobs([]); // Xóa danh sách cũ nếu có
-              setErrorMsg("Hiện tại chưa có việc làm nào thực sự phù hợp với CV của bạn. Hãy thử cập nhật thêm kỹ năng nhé!");
-              setLoading(false);
-              return;
-            }
-
-            const mappedJobs = rawJobs.map(job => ({
-              ...job,
-              company: {
-                ...job.company,
-                name: job.company?.company_name || "Nhà tuyển dụng",
-                company_name: job.company?.company_name || "Nhà tuyển dụng"
-              },
-              location: job.location || "Toàn quốc",
-              salary: job.is_negotiable
-                ? "Thỏa thuận"
-                : `${(job.salary_min / 1000000).toFixed(0)}tr - ${(job.salary_max / 1000000).toFixed(0)}tr`,
-              logoBg: job.logo_bg || "bg-orange-600",
-              tags: job.skills ? job.skills.map(s => s.name) : [],
-              matchScore: Math.round(job.matching_score || 0),
-              aiReason: job.ai_reason || "Phù hợp với định hướng nghề nghiệp."
-            }));
-
-            setAiRecommendedJobs(mappedJobs);
-
-            const realType = response.data.analyzed_type;
-            const realId = response.data.analyzed_id;
-
-            if (realType && realId) {
-              setSelectedCv({ type: realType, id: String(realId) });
-              localStorage.setItem('last_ai_cv_type', realType);
-              localStorage.setItem('last_ai_cv_id', String(realId));
-            }
-
-            setLoading(false);
-          }
+      if (response.data && response.data.success) {
+        // TRƯỜNG HỢP 1: Hệ thống báo hàng đợi vẫn đang xử lý ('processing')
+        if (response.data.status === 'processing') {
+          console.log("⏳ AI vẫn đang tính toán ngầm dưới Backend...");
+          return;
         }
-      } catch (error) {
-        if (axios.isCancel(error)) return;
-        console.error("Lỗi trong quá trình hỏi thăm AI:", error);
-        clearPreviousPolling(); // 🛑 Dừng vòng lặp khi gặp lỗi hệ thống
-        setErrorMsg(error.response?.data?.message || "Hệ thống AI gặp sự cố. Vui lòng thử lại!");
-        setLoading(false);
+
+        // 🔥 THÊM TRƯỜNG HỢP NÀY: Nếu Backend báo 'failed', dập tắt Polling ngay lập tức!
+        if (response.data.status === 'failed') {
+          console.log("🛑 Hệ thống báo lỗi từ hàng đợi.");
+          if (pollingIntervalRef.current) {
+            clearInterval(pollingIntervalRef.current);
+            pollingIntervalRef.current = null;
+          }
+          setErrorMsg("AI xử lý quá hạn hoặc gặp sự cố. Vui lòng thử lại sau!");
+          setLoading(false);
+          return;
+        }
+
+        // TRƯỜNG HỢP 2: Hệ thống báo đã hoàn thành xử lý ('completed')
+        if (response.data.status === 'completed') {
+          console.log("🎉 AI đã xử lý xong hoàn toàn! Tiến hành render...");
+          
+          // 🛑 Dừng vòng lặp hỏi thăm ngay lập tức trước khi cập nhật State
+          if (pollingIntervalRef.current) {
+            clearInterval(pollingIntervalRef.current);
+            pollingIntervalRef.current = null;
+          }
+
+          const rawJobs = response.data.data || [];
+
+          // 🔥 Kiểm tra nếu danh sách việc làm trống
+          if (rawJobs.length === 0) {
+            console.log("📭 Không tìm thấy việc làm nào phù hợp.");
+            setAiRecommendedJobs([]); 
+            setErrorMsg("Hiện tại chưa có việc làm nào thực sự phù hợp với CV của bạn. Hãy thử cập nhật thêm kỹ năng nhé!");
+            setLoading(false);
+            return;
+          }
+
+          const mappedJobs = rawJobs.map(job => ({
+            ...job,
+            company: {
+              ...job.company,
+              name: job.company?.company_name || "Nhà tuyển dụng",
+              company_name: job.company?.company_name || "Nhà tuyển dụng"
+            },
+            location: job.location || "Toàn quốc",
+            salary: job.is_negotiable
+              ? "Thỏa thuận"
+              : `${(job.salary_min / 1000000).toFixed(0)}tr - ${(job.salary_max / 1000000).toFixed(0)}tr`,
+            logoBg: job.logo_bg || "bg-orange-600",
+            tags: job.skills ? job.skills.map(s => s.name) : [],
+            matchScore: Math.round(job.matching_score || 0),
+            aiReason: job.ai_reason || "Phù hợp với định hướng nghề nghiệp."
+          }));
+
+          setAiRecommendedJobs(mappedJobs);
+
+          const realType = response.data.analyzed_type;
+          const realId = response.data.analyzed_id;
+
+          if (realType && realId) {
+            setSelectedCv({ type: realType, id: String(realId) });
+            localStorage.setItem('last_ai_cv_type', realType);
+            localStorage.setItem('last_ai_cv_id', String(realId));
+          }
+
+          setLoading(false);
+        }
       }
-    };
-
-    // 🚀 Chạy kích hoạt lần đầu tiên ngay lập tức
-    await executeCheck();
-
-    // 🔁 Nếu sau lần đầu vẫn chưa xong (đang ở trạng thái loading), setup vòng lặp chạy mỗi 2 giây
-    if (pollingIntervalRef.current === null) {
-      pollingIntervalRef.current = setInterval(() => {
-        executeCheck();
-      }, 2000); // 2000ms = Hỏi thăm lại sau mỗi 2 giây
+    } catch (error) {
+      if (axios.isCancel(error)) {
+        console.log("✈️ Request cũ đã được hủy an toàn.");
+        return;
+      }
+      console.error("Lỗi trong quá trình hỏi thăm AI:", error);
+      
+      if (pollingIntervalRef.current) {
+        clearInterval(pollingIntervalRef.current);
+        pollingIntervalRef.current = null;
+      }
+      setErrorMsg(error.response?.data?.message || "Hệ thống AI gặp sự cố. Vui lòng thử lại!");
+      setLoading(false);
     }
   };
+
+  // 🚀 Chạy kích hoạt lần đầu tiên ngay lập tức
+  await executeCheck();
+
+  // 🔁 Kiểm tra nghiêm ngặt: Nếu vẫn đang loading và CHƯA có interval nào chạy thì mới tạo
+  if (pollingIntervalRef.current === null) {
+    pollingIntervalRef.current = setInterval(() => {
+      executeCheck();
+    }, 2000); 
+  }
+};
 
   useEffect(() => {
     if (isLoggedIn) {

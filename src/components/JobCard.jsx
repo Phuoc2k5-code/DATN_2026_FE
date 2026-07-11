@@ -32,7 +32,7 @@ export default function JobCard({ job, onRemoveSuccess }) {
 
   // Điều hướng chính: Khi click vào bất kỳ vùng trống nào trên Card
   const handleCardClick = () => {
-    navigate(`/jobs/${job.id}`);
+    navigate(`/jobs/${job.id}`, { state: { textIsSaved: isSaved } });
   };
 
   // Điều hướng riêng: Khi click vào tên công ty
